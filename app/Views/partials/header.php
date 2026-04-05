@@ -36,10 +36,11 @@ $navItems = [
     <title><?= htmlspecialchars($title ?? $config['app']['name']) ?></title>
     <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/public/assets/css/app.css?v=<?= (int) $cssVersion ?>">
 </head>
-<body class="<?= $user ? 'has-shell' : 'login-view' ?>">
+<body class="<?= $user ? 'has-shell' : 'login-view' ?>" data-route="<?= htmlspecialchars((string) $currentRoute) ?>">
 <?php if ($user): ?>
 <div class="app-shell" data-shell>
     <aside class="sidebar" data-sidebar>
+        <div class="sidebar-accent" aria-hidden="true"></div>
         <div class="sidebar-top">
             <div class="sidebar-brand-row">
                 <a class="sidebar-brand" href="<?= htmlspecialchars($baseUrl) ?>/index.php?route=dashboard">
@@ -80,6 +81,7 @@ $navItems = [
 
     <div class="shell-main">
         <header class="topbar">
+            <div class="topbar-accent" aria-hidden="true"></div>
             <div class="topbar-search">
                 <span class="input-icon"><?= Ui::icon('search') ?></span>
                 <input type="text" placeholder="Search posts, clients, campaigns...">

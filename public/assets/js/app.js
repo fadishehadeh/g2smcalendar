@@ -1,5 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.add('ui-ready');
+    window.requestAnimationFrame(() => {
+        document.body.classList.add('is-loaded');
+    });
 
     const readJsonStore = (selector) => {
         const node = document.querySelector(selector);
@@ -733,6 +736,55 @@ document.addEventListener('DOMContentLoaded', () => {
         updateArtworkSizeOptions();
         updateStep();
     }
+
+    const counters = document.querySelectorAll('.kpi-card strong');
+    if (counters.length && 'IntersectionObserver' in window) {
+        const counterObserver = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting || entry.target.dataset.counted === '1') {
+                    return;
+                }
+
+                const node = entry.target;
+                const raw = (node.textContent || '').replace(/,/g, '').trim();
+                const target = Number(raw);
+                if (!Number.isFinite(target)) {
+                    node.dataset.counted = '1';
+                    counterObserver.unobserve(node);
+                    return;
+                }
+
+                const duration = 720;
+                const start = performance.now();
+                const step = (now) => {
+                    const progress = Math.min(1, (now - start) / duration);
+                    const eased = 1 - Math.pow(1 - progress, 3);
+                    node.textContent = Math.round(target * eased).toLocaleString();
+                    if (progress < 1) {
+                        requestAnimationFrame(step);
+                    } else {
+                        node.dataset.counted = '1';
+                    }
+                };
+
+                requestAnimationFrame(step);
+                counterObserver.unobserve(node);
+            });
+        }, { threshold: 0.35 });
+
+        counters.forEach((node) => counterObserver.observe(node));
+    }
+
+    document.querySelectorAll('.flash').forEach((flash, index) => {
+        flash.style.setProperty('--flash-delay', `${index * 90}ms`);
+        const dismiss = () => {
+            flash.classList.add('is-exit');
+            window.setTimeout(() => flash.remove(), 260);
+        };
+
+        window.setTimeout(dismiss, 4600 + (index * 500));
+        flash.addEventListener('click', dismiss);
+    });
 
     document.querySelectorAll('[data-flow-wizard]').forEach((flowWizard) => {
         const panels = [...flowWizard.querySelectorAll('[data-step-panel]')];
