@@ -111,6 +111,26 @@ final class WorkspaceController extends Controller
         ]);
     }
 
+    public function analytics(): void
+    {
+        Auth::requireRole(['master_admin', 'employee', 'client']);
+        $workspace = new WorkspaceService();
+        $filters = [
+            'month' => $_GET['month'] ?? date('n'),
+            'year' => $_GET['year'] ?? date('Y'),
+            'client_id' => $_GET['client_id'] ?? '',
+            'platform' => $_GET['platform'] ?? '',
+        ];
+
+        $this->view('workspace/analytics', [
+            'title' => 'Analytics',
+            'filters' => $filters,
+            'overview' => $workspace->analyticsOverview($filters),
+            'posts' => $workspace->analyticsPosts($filters),
+            'clients' => $workspace->clientCards(),
+        ]);
+    }
+
     public function artwork(): void
     {
         Auth::requireRole(['master_admin', 'employee', 'client']);

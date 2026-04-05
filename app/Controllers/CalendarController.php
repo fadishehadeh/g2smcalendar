@@ -29,6 +29,8 @@ final class CalendarController extends Controller
             'client_id' => $_GET['client_id'] ?? '',
             'month' => $_GET['month'] ?? date('n'),
             'year' => $_GET['year'] ?? date('Y'),
+            'view' => $_GET['view'] ?? 'monthly',
+            'anchor_date' => $_GET['anchor_date'] ?? '',
             'status' => $_GET['status'] ?? '',
             'platform' => $_GET['platform'] ?? '',
             'search' => $_GET['search'] ?? '',
@@ -48,6 +50,7 @@ final class CalendarController extends Controller
             'items' => $items,
             'filters' => $filters,
             'statuses' => CalendarItem::STATUSES,
+            'platforms' => CalendarItem::PLATFORMS,
             'monthData' => $monthData,
         ]);
     }
@@ -69,6 +72,7 @@ final class CalendarController extends Controller
         $files = CalendarItem::files($itemId);
         $history = CalendarItem::history($itemId);
         $activity = CalendarItem::activity($itemId);
+        $editHistory = CalendarItem::editHistory($itemId);
 
         $this->view('calendar/show', [
             'title' => $item['title'],
@@ -77,6 +81,7 @@ final class CalendarController extends Controller
             'files' => $files,
             'history' => $history,
             'activity' => $activity,
+            'editHistory' => $editHistory,
             'statuses' => CalendarItem::STATUSES,
         ]);
     }
@@ -135,6 +140,7 @@ final class CalendarController extends Controller
                  WHERE id = :id",
                 $data + ['id' => $itemId]
             );
+            $this->recordEditHistory($itemId, $user['id'], $previousItem, $data);
         } else {
             $itemId = Database::insert(
                 "INSERT INTO calendar_items (
@@ -171,7 +177,7 @@ final class CalendarController extends Controller
 
         ActivityLogger::log('item_saved', 'calendar_item', $itemId, ['title' => $data['title'], 'status' => $data['status']]);
 
-        if ($data['status'] === 'For Client Approval' && (($previousItem['status'] ?? null) !== 'For Client Approval')) {
+        if ($data['status'] === 'Pending Approval' && (($previousItem['status'] ?? null) !== 'Pending Approval')) {
             $this->notifyClientForApproval($itemId);
         }
 
@@ -227,7 +233,7 @@ final class CalendarController extends Controller
                      version_number = :version,
                      status = CASE
                         WHEN :is_client = 1 THEN status
-                        WHEN status IN ('Draft', 'In Progress', 'Rejected', 'Revision Requested') THEN 'For Client Approval'
+                        WHEN status IN ('Draft', 'In Progress', 'Rejected', 'Revision Requested') THEN 'Pending Approval'
                         ELSE status
                      END
                  WHERE id = :id",
@@ -247,7 +253,7 @@ final class CalendarController extends Controller
                         'item' => $itemId,
                         'user' => $user['id'],
                         'previous' => $item['status'],
-                        'new' => in_array($item['status'], ['Draft', 'In Progress', 'Rejected', 'Revision Requested'], true) ? 'For Client Approval' : $item['status'],
+                        'new' => in_array($item['status'], ['Draft', 'In Progress', 'Rejected', 'Revision Requested'], true) ? 'Pending Approval' : $item['status'],
                         'comment' => 'Artwork uploaded and routed for review.',
                     ]
                 );
@@ -319,7 +325,7 @@ final class CalendarController extends Controller
         ActivityLogger::log('status_changed', 'calendar_item', $itemId, ['previous' => $previousStatus, 'new' => $newStatus]);
 
         $notificationService = new NotificationService($this->config);
-        if ($newStatus === 'For Client Approval') {
+        if ($newStatus === 'Pending Approval') {
             $this->notifyClientForApproval($itemId);
         }
 
@@ -387,7 +393,50 @@ final class CalendarController extends Controller
             $itemId,
             'item_submitted',
             'New post submitted for approval',
-            "Post: {$item['title']}\nClient: {$item['company_name']}\nStatus: For Client Approval\nLink: index.php?route=calendar.item&item_id={$itemId}"
+            "Post: {$item['title']}\nClient: {$item['company_name']}\nStatus: Pending Approval\nLink: index.php?route=calendar.item&item_id={$itemId}"
         );
+    }
+
+    private function recordEditHistory(int $itemId, int $userId, array $previousItem, array $data): void
+    {
+        $fields = [
+            'title' => 'Title',
+            'platform' => 'Platform',
+            'scheduled_date' => 'Scheduled Date',
+            'scheduled_time' => 'Scheduled Time',
+            'post_type' => 'Post Type',
+            'format' => 'Format',
+            'size' => 'Size',
+            'caption_en' => 'Caption (EN)',
+            'caption_ar' => 'Caption (AR)',
+            'hashtags' => 'Hashtags',
+            'campaign' => 'Campaign',
+            'content_pillar' => 'Content Pillar',
+            'cta' => 'CTA',
+            'internal_notes' => 'Internal Notes',
+            'client_notes' => 'Client Notes',
+            'status' => 'Status',
+        ];
+
+        foreach ($fields as $field => $label) {
+            $oldValue = trim((string) ($previousItem[$field] ?? ''));
+            $newValue = trim((string) ($data[$field] ?? ''));
+
+            if ($oldValue === $newValue) {
+                continue;
+            }
+
+            Database::insert(
+                'INSERT INTO item_edit_history (calendar_item_id, changed_by, field_name, old_value, new_value)
+                 VALUES (:item, :user, :field_name, :old_value, :new_value)',
+                [
+                    'item' => $itemId,
+                    'user' => $userId,
+                    'field_name' => $label,
+                    'old_value' => $oldValue !== '' ? $oldValue : null,
+                    'new_value' => $newValue !== '' ? $newValue : null,
+                ]
+            );
+        }
     }
 }

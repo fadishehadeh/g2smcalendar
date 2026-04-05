@@ -13,6 +13,7 @@ use App\Controllers\DownloadController;
 use App\Controllers\EmployeeController;
 use App\Controllers\WorkspaceController;
 use App\Controllers\WizardController;
+use App\Services\SchemaSyncService;
 use App\Services\WorkspaceService;
 
 final class App
@@ -56,6 +57,7 @@ final class App
             'wizard.generate' => [WizardController::class, 'generate'],
             'posts' => [WorkspaceController::class, 'posts'],
             'posts.bulk' => [WorkspaceController::class, 'bulkPosts'],
+            'analytics' => [WorkspaceController::class, 'analytics'],
             'approvals' => [WorkspaceController::class, 'approvals'],
             'artwork' => [WorkspaceController::class, 'artwork'],
             'notifications' => [WorkspaceController::class, 'notifications'],
@@ -104,6 +106,7 @@ final class App
         session_start();
 
         Database::connect($this->config['database']);
+        SchemaSyncService::sync();
         View::share('config', $this->config);
         View::share('authUser', Auth::user());
         View::share('flash', $_SESSION['flash'] ?? []);

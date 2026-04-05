@@ -94,7 +94,7 @@ final class WizardController extends Controller
                             'content_pillar' => $_POST['content_pillar'] ?? '',
                             'cta' => $_POST['cta'] ?? '',
                             'internal_notes' => $_POST['notes'] ?? '',
-                            'status' => 'For Client Approval',
+                            'status' => 'Pending Approval',
                         ]
                     );
 
@@ -124,7 +124,7 @@ final class WizardController extends Controller
                             'item' => $itemId,
                             'user' => $user['id'],
                             'previous' => 'Draft',
-                            'new' => 'For Client Approval',
+                            'new' => 'Pending Approval',
                             'comment' => 'Generated via bulk wizard.',
                         ]
                     );

@@ -9,10 +9,18 @@ use App\Core\Database;
 
 final class CalendarItem
 {
+    public const PLATFORMS = [
+        'Instagram',
+        'Facebook',
+        'TikTok',
+        'YouTube',
+        'X',
+    ];
+
     public const STATUSES = [
         'Draft',
         'In Progress',
-        'For Client Approval',
+        'Pending Approval',
         'Approved',
         'Rejected',
         'Revision Requested',
@@ -85,6 +93,18 @@ final class CalendarItem
              LEFT JOIN roles r ON r.id = u.role_id
              WHERE al.entity_type = 'calendar_item' AND al.entity_id = :item_id
              ORDER BY al.created_at DESC, al.id DESC",
+            ['item_id' => $itemId]
+        );
+    }
+
+    public static function editHistory(int $itemId): array
+    {
+        return Database::fetchAll(
+            "SELECT ieh.*, u.name
+             FROM item_edit_history ieh
+             JOIN users u ON u.id = ieh.changed_by
+             WHERE ieh.calendar_item_id = :item_id
+             ORDER BY ieh.created_at DESC, ieh.id DESC",
             ['item_id' => $itemId]
         );
     }

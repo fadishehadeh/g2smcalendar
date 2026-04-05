@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Core\Auth;
 use App\Core\Database;
+use App\Models\CalendarItem;
 
 final class WorkspaceService
 {
@@ -81,7 +82,7 @@ final class WorkspaceService
             'clients' => $clients,
             'employees' => $employees,
             'calendars' => $calendars,
-            'pending_approvals' => $map['For Client Approval'] ?? 0,
+            'pending_approvals' => $map['Pending Approval'] ?? 0,
             'approved' => $map['Approved'] ?? 0,
             'rejected' => $map['Rejected'] ?? 0,
             'downloads' => $downloads,
@@ -181,7 +182,7 @@ final class WorkspaceService
     public function approvals(): array
     {
         [$scope, $params] = $this->scope('ci.client_id');
-        $params['status'] = 'For Client Approval';
+        $params['status'] = 'Pending Approval';
 
         return Database::fetchAll(
             "SELECT ci.*, c.company_name,
@@ -244,7 +245,7 @@ final class WorkspaceService
         $rows = Database::fetchAll(
             "SELECT u.*, r.name AS role_name,
                     COUNT(DISTINCT eca.client_id) AS clients_count,
-                    COUNT(DISTINCT CASE WHEN ci.status IN ('Draft', 'In Progress', 'For Client Approval') THEN ci.id END) AS active_tasks
+                    COUNT(DISTINCT CASE WHEN ci.status IN ('Draft', 'In Progress', 'Pending Approval') THEN ci.id END) AS active_tasks
              FROM users u
              JOIN roles r ON r.id = u.role_id
              LEFT JOIN employee_client_assignments eca ON eca.employee_user_id = u.id
@@ -322,11 +323,27 @@ final class WorkspaceService
 
     public function calendarMonth(array $filters): array
     {
+        return $this->calendarView($filters);
+    }
+
+    public function calendarView(array $filters): array
+    {
         [$scope, $params] = $this->scope('ci.client_id');
+        $view = ($filters['view'] ?? 'monthly') === 'weekly' ? 'weekly' : 'monthly';
         $month = (int) ($filters['month'] ?? date('n'));
         $year = (int) ($filters['year'] ?? date('Y'));
-        $from = sprintf('%04d-%02d-01', $year, $month);
-        $to = date('Y-m-t', strtotime($from));
+        $anchorDate = trim((string) ($filters['anchor_date'] ?? ''));
+        if ($anchorDate === '') {
+            $anchorDate = sprintf('%04d-%02d-01', $year, $month);
+        }
+
+        if ($view === 'weekly') {
+            $from = date('Y-m-d', strtotime('monday this week', strtotime($anchorDate)));
+            $to = date('Y-m-d', strtotime($from . ' +6 days'));
+        } else {
+            $from = sprintf('%04d-%02d-01', $year, $month);
+            $to = date('Y-m-t', strtotime($from));
+        }
 
         $where = [$scope, 'ci.scheduled_date BETWEEN :from_date AND :to_date'];
         if ($this->hasSoftDeleteColumns()) {
@@ -376,8 +393,13 @@ final class WorkspaceService
         );
 
         return [
+            'view' => $view,
             'month' => $month,
             'year' => $year,
+            'from' => $from,
+            'to' => $to,
+            'anchor_date' => $anchorDate,
+            'week_dates' => $view === 'weekly' ? $this->weekDates($from) : [],
             'items' => $items,
             'total_posts' => count($items),
         ];
@@ -390,9 +412,9 @@ final class WorkspaceService
         $where = [$scope];
 
         if ($user['role_name'] === 'client') {
-            $where[] = "ci.status = 'For Client Approval'";
+            $where[] = "ci.status = 'Pending Approval'";
         } else {
-            $where[] = "ci.status IN ('For Client Approval', 'Revision Requested', 'Rejected')";
+            $where[] = "ci.status IN ('Pending Approval', 'Revision Requested', 'Rejected')";
         }
         if ($this->hasSoftDeleteColumns()) {
             $where[] = 'ci.deleted_at IS NULL';
@@ -425,10 +447,157 @@ final class WorkspaceService
         foreach ($rows as &$row) {
             $row['action_label'] = $user['role_name'] === 'client'
                 ? 'Review now'
-                : (($row['status'] ?? '') === 'For Client Approval' ? 'Track review' : 'Revise item');
+                : (($row['status'] ?? '') === 'Pending Approval' ? 'Track review' : 'Revise item');
         }
 
         return $rows;
+    }
+
+    public function analyticsOverview(array $filters = []): array
+    {
+        [$scope, $params] = $this->scope('ci.client_id');
+        $range = $this->analyticsRange($filters);
+        $where = [$scope, 'pm.metric_date BETWEEN :from_date AND :to_date'];
+        $params['from_date'] = $range['from'];
+        $params['to_date'] = $range['to'];
+
+        if (!empty($filters['client_id'])) {
+            $where[] = 'ci.client_id = :client_id';
+            $params['client_id'] = (int) $filters['client_id'];
+        }
+
+        if (!empty($filters['platform'])) {
+            $where[] = 'ci.platform = :platform';
+            $params['platform'] = (string) $filters['platform'];
+        }
+
+        $totals = Database::fetch(
+            "SELECT
+                COUNT(DISTINCT ci.id) AS posts,
+                COALESCE(SUM(pm.reach), 0) AS reach,
+                COALESCE(SUM(pm.engagement), 0) AS engagement,
+                COALESCE(SUM(pm.clicks), 0) AS clicks,
+                COALESCE(SUM(pm.impressions), 0) AS impressions,
+                COALESCE(SUM(pm.saves), 0) AS saves,
+                COALESCE(SUM(pm.shares), 0) AS shares
+             FROM post_metrics pm
+             JOIN calendar_items ci ON ci.id = pm.calendar_item_id
+             WHERE " . implode(' AND ', $where),
+            $params
+        ) ?? [];
+
+        $platforms = Database::fetchAll(
+            "SELECT ci.platform,
+                    COUNT(DISTINCT ci.id) AS posts,
+                    COALESCE(SUM(pm.reach), 0) AS reach,
+                    COALESCE(SUM(pm.engagement), 0) AS engagement,
+                    COALESCE(SUM(pm.clicks), 0) AS clicks
+             FROM post_metrics pm
+             JOIN calendar_items ci ON ci.id = pm.calendar_item_id
+             WHERE " . implode(' AND ', $where) . "
+             GROUP BY ci.platform
+             ORDER BY reach DESC, ci.platform ASC",
+            $params
+        );
+
+        $current = $this->analyticsTotalsForRange($where, $params, $range['from'], $range['to']);
+        $comparison = $this->analyticsTotalsForRange($where, $params, $range['compare_from'], $range['compare_to']);
+
+        return [
+            'range' => $range,
+            'totals' => $totals,
+            'platforms' => $platforms,
+            'comparison' => [
+                'reach_delta' => ((int) ($current['reach'] ?? 0)) - ((int) ($comparison['reach'] ?? 0)),
+                'engagement_delta' => ((int) ($current['engagement'] ?? 0)) - ((int) ($comparison['engagement'] ?? 0)),
+                'clicks_delta' => ((int) ($current['clicks'] ?? 0)) - ((int) ($comparison['clicks'] ?? 0)),
+            ],
+        ];
+    }
+
+    public function analyticsPosts(array $filters = []): array
+    {
+        [$scope, $params] = $this->scope('ci.client_id');
+        $range = $this->analyticsRange($filters);
+        $where = [$scope, 'pm.metric_date BETWEEN :from_date AND :to_date'];
+        $params['from_date'] = $range['from'];
+        $params['to_date'] = $range['to'];
+
+        if (!empty($filters['client_id'])) {
+            $where[] = 'ci.client_id = :client_id';
+            $params['client_id'] = (int) $filters['client_id'];
+        }
+
+        if (!empty($filters['platform'])) {
+            $where[] = 'ci.platform = :platform';
+            $params['platform'] = (string) $filters['platform'];
+        }
+
+        return Database::fetchAll(
+            "SELECT ci.id, ci.title, ci.platform, ci.status, ci.scheduled_date, c.company_name,
+                    SUM(pm.reach) AS reach,
+                    SUM(pm.engagement) AS engagement,
+                    SUM(pm.clicks) AS clicks,
+                    SUM(pm.impressions) AS impressions,
+                    SUM(pm.saves) AS saves,
+                    SUM(pm.shares) AS shares
+             FROM post_metrics pm
+             JOIN calendar_items ci ON ci.id = pm.calendar_item_id
+             JOIN clients c ON c.id = ci.client_id
+             WHERE " . implode(' AND ', $where) . "
+             GROUP BY ci.id, ci.title, ci.platform, ci.status, ci.scheduled_date, c.company_name
+             ORDER BY reach DESC, engagement DESC, ci.scheduled_date DESC",
+            $params
+        );
+    }
+
+    private function weekDates(string $from): array
+    {
+        $days = [];
+        for ($offset = 0; $offset < 7; $offset++) {
+            $days[] = date('Y-m-d', strtotime($from . " +{$offset} days"));
+        }
+
+        return $days;
+    }
+
+    private function analyticsRange(array $filters): array
+    {
+        $month = (int) ($filters['month'] ?? date('n'));
+        $year = (int) ($filters['year'] ?? date('Y'));
+        $from = sprintf('%04d-%02d-01', $year, $month);
+        $to = date('Y-m-t', strtotime($from));
+        $compareFrom = date('Y-m-01', strtotime($from . ' -1 month'));
+        $compareTo = date('Y-m-t', strtotime($compareFrom));
+
+        return [
+            'from' => $from,
+            'to' => $to,
+            'compare_from' => $compareFrom,
+            'compare_to' => $compareTo,
+            'label' => date('F Y', strtotime($from)),
+            'compare_label' => date('F Y', strtotime($compareFrom)),
+        ];
+    }
+
+    private function analyticsTotalsForRange(array $where, array $params, string $from, string $to): array
+    {
+        $localWhere = array_values(array_filter($where, static fn (string $clause): bool => $clause !== 'pm.metric_date BETWEEN :from_date AND :to_date'));
+        $localWhere[] = 'pm.metric_date BETWEEN :from_date AND :to_date';
+        $localParams = $params;
+        $localParams['from_date'] = $from;
+        $localParams['to_date'] = $to;
+
+        return Database::fetch(
+            "SELECT
+                COALESCE(SUM(pm.reach), 0) AS reach,
+                COALESCE(SUM(pm.engagement), 0) AS engagement,
+                COALESCE(SUM(pm.clicks), 0) AS clicks
+             FROM post_metrics pm
+             JOIN calendar_items ci ON ci.id = pm.calendar_item_id
+             WHERE " . implode(' AND ', $localWhere),
+            $localParams
+        ) ?? [];
     }
 
     private function scope(string $clientColumn): array

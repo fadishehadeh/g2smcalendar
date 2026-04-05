@@ -17,6 +17,7 @@ $navItems = [
     ['route' => 'employees', 'label' => 'Employees', 'icon' => 'employees', 'roles' => ['master_admin']],
     ['route' => 'assignments', 'label' => 'Assignments', 'icon' => 'assignments', 'roles' => ['master_admin']],
     ['route' => 'posts', 'label' => 'All Posts', 'icon' => 'posts', 'roles' => ['master_admin', 'employee', 'client']],
+    ['route' => 'analytics', 'label' => 'Analytics', 'icon' => 'trend', 'roles' => ['master_admin', 'employee', 'client']],
     ['route' => 'approvals', 'label' => 'Approvals', 'icon' => 'approvals', 'roles' => ['master_admin', 'employee', 'client']],
     ['route' => 'artwork', 'label' => 'Artwork Library', 'icon' => 'artwork', 'roles' => ['master_admin', 'employee', 'client']],
     ['route' => 'notifications', 'label' => 'Notifications', 'icon' => 'notifications', 'roles' => ['master_admin', 'employee', 'client']],

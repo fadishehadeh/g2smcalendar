@@ -6,6 +6,11 @@ namespace App\Core;
 
 final class Ui
 {
+    public static function normalizeStatus(?string $status): string
+    {
+        return (string) $status === 'For Client Approval' ? 'Pending Approval' : trim((string) $status);
+    }
+
     public static function initials(?string $name): string
     {
         $name = trim((string) $name);
@@ -34,7 +39,7 @@ final class Ui
 
     public static function statusClass(?string $status): string
     {
-        $status = strtolower(trim((string) $status));
+        $status = strtolower(self::normalizeStatus($status));
         $status = str_replace([' ', '/'], ['-', '-'], $status);
         return 'status-' . $status;
     }

@@ -139,6 +139,37 @@ CREATE TABLE item_status_history (
     CONSTRAINT fk_status_history_user FOREIGN KEY (changed_by) REFERENCES users(id)
 );
 
+CREATE TABLE item_edit_history (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    calendar_item_id INT UNSIGNED NOT NULL,
+    changed_by INT UNSIGNED NOT NULL,
+    field_name VARCHAR(80) NOT NULL,
+    old_value TEXT NULL,
+    new_value TEXT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_item_edit_history_item (calendar_item_id),
+    INDEX idx_item_edit_history_created (created_at),
+    CONSTRAINT fk_item_edit_history_item FOREIGN KEY (calendar_item_id) REFERENCES calendar_items(id) ON DELETE CASCADE,
+    CONSTRAINT fk_item_edit_history_user FOREIGN KEY (changed_by) REFERENCES users(id)
+);
+
+CREATE TABLE post_metrics (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    calendar_item_id INT UNSIGNED NOT NULL,
+    metric_date DATE NOT NULL,
+    reach INT UNSIGNED NOT NULL DEFAULT 0,
+    engagement INT UNSIGNED NOT NULL DEFAULT 0,
+    clicks INT UNSIGNED NOT NULL DEFAULT 0,
+    impressions INT UNSIGNED NOT NULL DEFAULT 0,
+    saves INT UNSIGNED NOT NULL DEFAULT 0,
+    shares INT UNSIGNED NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_post_metrics_item_date (calendar_item_id, metric_date),
+    INDEX idx_post_metrics_date (metric_date),
+    CONSTRAINT fk_post_metrics_item FOREIGN KEY (calendar_item_id) REFERENCES calendar_items(id) ON DELETE CASCADE
+);
+
 CREATE TABLE notifications (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     user_id INT UNSIGNED NOT NULL,

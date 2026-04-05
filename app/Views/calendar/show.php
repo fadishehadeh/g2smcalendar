@@ -77,6 +77,16 @@ foreach ($comments as $comment) {
     ];
 }
 
+foreach ($editHistory as $entry) {
+    $timeline[] = [
+        'type' => 'edit',
+        'timestamp' => $entry['created_at'] ?? '',
+        'title' => ($entry['field_name'] ?? 'Field') . ' updated',
+        'meta' => ($entry['name'] ?? 'System') . ' · Edit history',
+        'body' => trim(('From: ' . (($entry['old_value'] ?? '') !== '' ? $entry['old_value'] : '-')) . "\n" . ('To: ' . (($entry['new_value'] ?? '') !== '' ? $entry['new_value'] : '-'))),
+    ];
+}
+
 foreach ($activity as $entry) {
     $timeline[] = [
         'type' => 'activity',
@@ -164,9 +174,9 @@ usort($timeline, static function (array $a, array $b): int {
                         <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar.status" class="stack compact">
                             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
                             <input type="hidden" name="item_id" value="<?= (int) $item['id'] ?>">
-                            <input type="hidden" name="status" value="For Client Approval">
+                            <input type="hidden" name="status" value="Pending Approval">
                             <textarea name="comment" placeholder="Optional note for the client review email or internal handoff"></textarea>
-                            <button class="btn btn-primary" type="submit">Send Artwork For Client Approval</button>
+                            <button class="btn btn-primary" type="submit">Send Artwork For Pending Approval</button>
                         </form>
                     <?php elseif (!$latestPreviewFileId): ?>
                         <p class="muted">Upload artwork first, then this one-click send action will be available.</p>
@@ -210,6 +220,53 @@ usort($timeline, static function (array $a, array $b): int {
             <h4>Caption</h4>
             <p><?= nl2br(htmlspecialchars((string) ($item['caption_en'] ?: 'No caption added yet.'))) ?></p>
         </div>
+
+        <?php if ($roleName !== 'client'): ?>
+            <div class="detail-section">
+                <h4>Edit Post</h4>
+                <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar.save" enctype="multipart/form-data" class="stack compact">
+                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
+                    <input type="hidden" name="item_id" value="<?= (int) $item['id'] ?>">
+                    <input type="hidden" name="calendar_id" value="<?= (int) $item['calendar_id'] ?>">
+                    <input type="hidden" name="client_id" value="<?= (int) $item['client_id'] ?>">
+                    <input type="hidden" name="assigned_employee_id" value="<?= (int) $item['assigned_employee_id'] ?>">
+                    <div class="form-grid">
+                        <label><span>Title</span><input type="text" name="title" value="<?= htmlspecialchars($item['title']) ?>" required></label>
+                        <label>
+                            <span>Platform</span>
+                            <select name="platform">
+                                <?php foreach (\App\Models\CalendarItem::PLATFORMS as $platform): ?>
+                                    <option value="<?= htmlspecialchars($platform) ?>" <?= $item['platform'] === $platform ? 'selected' : '' ?>><?= htmlspecialchars($platform) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label><span>Scheduled Date</span><input type="date" name="scheduled_date" value="<?= htmlspecialchars($item['scheduled_date']) ?>" required></label>
+                        <label><span>Scheduled Time</span><input type="time" name="scheduled_time" value="<?= htmlspecialchars((string) ($item['scheduled_time'] ?? '')) ?>"></label>
+                        <label><span>Post Type</span><input type="text" name="post_type" value="<?= htmlspecialchars($item['post_type']) ?>" required></label>
+                        <label><span>Format</span><input type="text" name="format" value="<?= htmlspecialchars((string) ($item['format'] ?? '')) ?>"></label>
+                        <label><span>Size</span><input type="text" name="size" value="<?= htmlspecialchars((string) ($item['size'] ?? '')) ?>"></label>
+                        <label><span>Campaign</span><input type="text" name="campaign" value="<?= htmlspecialchars((string) ($item['campaign'] ?? '')) ?>"></label>
+                        <label><span>Content Pillar</span><input type="text" name="content_pillar" value="<?= htmlspecialchars((string) ($item['content_pillar'] ?? '')) ?>"></label>
+                        <label><span>CTA</span><input type="text" name="cta" value="<?= htmlspecialchars((string) ($item['cta'] ?? '')) ?>"></label>
+                        <label>
+                            <span>Status</span>
+                            <select name="status">
+                                <?php foreach ($statuses as $status): ?>
+                                    <?php if ($roleName === 'employee' && in_array($status, ['Approved', 'Rejected'], true)) { continue; } ?>
+                                    <option value="<?= htmlspecialchars($status) ?>" <?= $item['status'] === $status ? 'selected' : '' ?>><?= htmlspecialchars($status) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                    </div>
+                    <label><span>Caption (EN)</span><textarea name="caption_en"><?= htmlspecialchars((string) ($item['caption_en'] ?? '')) ?></textarea></label>
+                    <label><span>Caption (AR)</span><textarea name="caption_ar"><?= htmlspecialchars((string) ($item['caption_ar'] ?? '')) ?></textarea></label>
+                    <label><span>Hashtags</span><textarea name="hashtags"><?= htmlspecialchars((string) ($item['hashtags'] ?? '')) ?></textarea></label>
+                    <label><span>Internal Notes</span><textarea name="internal_notes"><?= htmlspecialchars((string) ($item['internal_notes'] ?? '')) ?></textarea></label>
+                    <label><span>Client Notes</span><textarea name="client_notes"><?= htmlspecialchars((string) ($item['client_notes'] ?? '')) ?></textarea></label>
+                    <button class="btn btn-primary" type="submit">Save Post Changes</button>
+                </form>
+            </div>
+        <?php endif; ?>
 
         <div class="detail-section">
             <h4><?= $canApprove ? 'Approval Action' : 'Workflow Action' ?></h4>
@@ -300,6 +357,26 @@ usort($timeline, static function (array $a, array $b): int {
                 <div class="mini-comment">
                     <strong><?= htmlspecialchars($comment['name']) ?> <small><?= htmlspecialchars($comment['role_name']) ?></small></strong>
                     <p><?= nl2br(htmlspecialchars($comment['comment'])) ?></p>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </article>
+    <article class="card">
+        <div class="card-head">
+            <div>
+                <h3>Edit History</h3>
+                <p>Field-level changes to captions, scheduling, status, and content metadata.</p>
+            </div>
+        </div>
+        <div class="mini-list">
+            <?php if ($editHistory === []): ?>
+                <div class="mini-comment"><p>No post field edits recorded yet.</p></div>
+            <?php endif; ?>
+            <?php foreach ($editHistory as $entry): ?>
+                <div class="mini-comment">
+                    <strong><?= htmlspecialchars($entry['field_name']) ?> <small><?= htmlspecialchars($entry['name']) ?></small></strong>
+                    <p>From: <?= nl2br(htmlspecialchars((string) ($entry['old_value'] !== null && $entry['old_value'] !== '' ? $entry['old_value'] : '-'))) ?></p>
+                    <p>To: <?= nl2br(htmlspecialchars((string) ($entry['new_value'] !== null && $entry['new_value'] !== '' ? $entry['new_value'] : '-'))) ?></p>
                 </div>
             <?php endforeach; ?>
         </div>

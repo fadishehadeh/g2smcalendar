@@ -46,7 +46,7 @@ foreach ($items as $item) {
                 </div>
                 <h3><?= htmlspecialchars($item['title']) ?></h3>
                 <p><?= htmlspecialchars(substr((string) ($item['caption_en'] ?: 'Review artwork, captions, and final delivery notes.'), 0, 110)) ?></p>
-                <span class="status-badge <?= Ui::statusClass('For Approval') ?>">For Approval</span>
+                <span class="status-badge <?= Ui::statusClass('Pending Approval') ?>">Pending Approval</span>
             </div>
             <div class="approval-actions">
                 <?php if ($canApprove): ?>

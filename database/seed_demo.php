@@ -80,6 +80,43 @@ function downloadDemoVideo(string $path): void
     }
 }
 
+q(
+    $pdo,
+    "CREATE TABLE IF NOT EXISTS item_edit_history (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        calendar_item_id INT UNSIGNED NOT NULL,
+        changed_by INT UNSIGNED NOT NULL,
+        field_name VARCHAR(80) NOT NULL,
+        old_value TEXT NULL,
+        new_value TEXT NULL,
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_item_edit_history_item (calendar_item_id),
+        INDEX idx_item_edit_history_created (created_at),
+        CONSTRAINT fk_item_edit_history_item FOREIGN KEY (calendar_item_id) REFERENCES calendar_items(id) ON DELETE CASCADE,
+        CONSTRAINT fk_item_edit_history_user FOREIGN KEY (changed_by) REFERENCES users(id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+);
+
+q(
+    $pdo,
+    "CREATE TABLE IF NOT EXISTS post_metrics (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        calendar_item_id INT UNSIGNED NOT NULL,
+        metric_date DATE NOT NULL,
+        reach INT UNSIGNED NOT NULL DEFAULT 0,
+        engagement INT UNSIGNED NOT NULL DEFAULT 0,
+        clicks INT UNSIGNED NOT NULL DEFAULT 0,
+        impressions INT UNSIGNED NOT NULL DEFAULT 0,
+        saves INT UNSIGNED NOT NULL DEFAULT 0,
+        shares INT UNSIGNED NOT NULL DEFAULT 0,
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_post_metrics_item_date (calendar_item_id, metric_date),
+        INDEX idx_post_metrics_date (metric_date),
+        CONSTRAINT fk_post_metrics_item FOREIGN KEY (calendar_item_id) REFERENCES calendar_items(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+);
+
 $artworks = [
     ['filename' => 'dukhan-campaign-1.svg', 'title' => 'Digital Banking Week', 'subtitle' => 'Campaign launch creative', 'primary' => '#8b1e1e', 'secondary' => '#d92d2a'],
     ['filename' => 'dukhan-campaign-2.svg', 'title' => 'Ramadan Savings Story', 'subtitle' => 'Story format visual', 'primary' => '#7c2d12', 'secondary' => '#ea580c'],
@@ -112,7 +149,9 @@ q($pdo, 'SET FOREIGN_KEY_CHECKS=0');
 foreach ([
     'download_logs',
     'notifications',
+    'post_metrics',
     'item_status_history',
+    'item_edit_history',
     'item_comments',
     'item_files',
     'activity_logs',
@@ -186,14 +225,14 @@ q(
 $calendarId = (int) v($pdo, 'SELECT id FROM calendars WHERE client_id = :client_id LIMIT 1', ['client_id' => $clientId]);
 
 $items = [
-    ['date' => '2026-04-03', 'platform' => 'Instagram', 'title' => 'Dukhan App Launch Reel', 'post_type' => 'Reel', 'format' => 'Video', 'size' => '9:16', 'campaign' => 'App Launch', 'status' => 'For Client Approval', 'artwork' => is_file($videoAsset) ? 'dukhan-demo-video.mp4' : 'dukhan-campaign-1.svg'],
+    ['date' => '2026-04-03', 'platform' => 'Instagram', 'title' => 'Dukhan App Launch Reel', 'post_type' => 'Reel', 'format' => 'Video', 'size' => '9:16', 'campaign' => 'App Launch', 'status' => 'Pending Approval', 'artwork' => is_file($videoAsset) ? 'dukhan-demo-video.mp4' : 'dukhan-campaign-1.svg'],
     ['date' => '2026-04-06', 'platform' => 'Instagram', 'title' => 'Ramadan Savings Story Set', 'post_type' => 'Story', 'format' => 'Image', 'size' => '9:16', 'campaign' => 'Ramadan Savings', 'status' => 'Draft', 'artwork' => 'dukhan-campaign-2.svg'],
     ['date' => '2026-04-09', 'platform' => 'Facebook', 'title' => 'Corporate Services Highlight', 'post_type' => 'Post', 'format' => 'Image', 'size' => '1080x1080', 'campaign' => 'Corporate Banking', 'status' => 'In Progress', 'artwork' => 'dukhan-campaign-3.svg'],
-    ['date' => '2026-04-12', 'platform' => 'YouTube', 'title' => 'Merchant Banking Explainer', 'post_type' => 'Video', 'format' => 'Video', 'size' => '16:9', 'campaign' => 'Merchant Banking', 'status' => 'For Client Approval', 'artwork' => is_file($videoAsset) ? 'dukhan-demo-video.mp4' : 'dukhan-campaign-4.svg'],
+    ['date' => '2026-04-12', 'platform' => 'YouTube', 'title' => 'Merchant Banking Explainer', 'post_type' => 'Video', 'format' => 'Video', 'size' => '16:9', 'campaign' => 'Merchant Banking', 'status' => 'Pending Approval', 'artwork' => is_file($videoAsset) ? 'dukhan-demo-video.mp4' : 'dukhan-campaign-4.svg'],
     ['date' => '2026-04-15', 'platform' => 'TikTok', 'title' => 'Mobile Transfer Quick Tips', 'post_type' => 'Video', 'format' => 'Video', 'size' => '9:16', 'campaign' => 'Mobile Banking', 'status' => 'Revision Requested', 'artwork' => is_file($videoAsset) ? 'dukhan-demo-video.mp4' : 'dukhan-campaign-1.svg'],
-    ['date' => '2026-04-18', 'platform' => 'Instagram', 'title' => 'Payroll Solution Carousel', 'post_type' => 'Carousel', 'format' => 'Carousel', 'size' => '1080x1080', 'campaign' => 'Payroll Solutions', 'status' => 'For Client Approval', 'artwork' => 'dukhan-campaign-2.svg'],
+    ['date' => '2026-04-18', 'platform' => 'Instagram', 'title' => 'Payroll Solution Carousel', 'post_type' => 'Carousel', 'format' => 'Carousel', 'size' => '1080x1080', 'campaign' => 'Payroll Solutions', 'status' => 'Pending Approval', 'artwork' => 'dukhan-campaign-2.svg'],
     ['date' => '2026-04-21', 'platform' => 'Facebook', 'title' => 'Business Account Feature Post', 'post_type' => 'Post', 'format' => 'Image', 'size' => '1080x1080', 'campaign' => 'Business Accounts', 'status' => 'Draft', 'artwork' => 'dukhan-campaign-3.svg'],
-    ['date' => '2026-04-24', 'platform' => 'Instagram', 'title' => 'Branch Experience Story', 'post_type' => 'Story', 'format' => 'Image', 'size' => '9:16', 'campaign' => 'Branch Experience', 'status' => 'For Client Approval', 'artwork' => 'dukhan-campaign-4.svg'],
+    ['date' => '2026-04-24', 'platform' => 'Instagram', 'title' => 'Branch Experience Story', 'post_type' => 'Story', 'format' => 'Image', 'size' => '9:16', 'campaign' => 'Branch Experience', 'status' => 'Pending Approval', 'artwork' => 'dukhan-campaign-4.svg'],
 ];
 
 $itemIds = [];
@@ -265,9 +304,9 @@ foreach ($commentRows as [$itemId, $userId, $visibility, $comment]) {
 }
 
 $historyRows = [
-    [$itemIds['Dukhan App Launch Reel'], $employeeId, 'Draft', 'For Client Approval', 'Submitted first draft for review'],
-    [$itemIds['Mobile Transfer Quick Tips'], $clientUserId, 'For Client Approval', 'Revision Requested', 'Requested visual changes'],
-    [$itemIds['Merchant Banking Explainer'], $employeeId, 'Draft', 'For Client Approval', 'Awaiting client confirmation'],
+    [$itemIds['Dukhan App Launch Reel'], $employeeId, 'Draft', 'Pending Approval', 'Submitted first draft for review'],
+    [$itemIds['Mobile Transfer Quick Tips'], $clientUserId, 'Pending Approval', 'Revision Requested', 'Requested visual changes'],
+    [$itemIds['Merchant Banking Explainer'], $employeeId, 'Draft', 'Pending Approval', 'Awaiting client confirmation'],
 ];
 
 foreach ($historyRows as [$itemId, $changedBy, $previousStatus, $newStatus, $comment]) {
@@ -325,6 +364,54 @@ foreach ($activityRows as [$userId, $action, $entityType, $entityId, $details]) 
             'entity_id' => $entityId,
             'details' => $details,
             'ip_address' => '127.0.0.1',
+        ]
+    );
+}
+
+$editRows = [
+    [$itemIds['Dukhan App Launch Reel'], $employeeId, 'Caption (EN)', 'Draft copy for Dukhan App Launch Reel', 'Refined launch copy with stronger hook'],
+    [$itemIds['Merchant Banking Explainer'], $employeeId, 'Scheduled Date', '2026-04-11', '2026-04-12'],
+    [$itemIds['Mobile Transfer Quick Tips'], $employeeId, 'Platform', 'Instagram', 'TikTok'],
+];
+
+foreach ($editRows as [$itemId, $changedBy, $fieldName, $oldValue, $newValue]) {
+    q(
+        $pdo,
+        'INSERT INTO item_edit_history (calendar_item_id, changed_by, field_name, old_value, new_value)
+         VALUES (:item_id, :changed_by, :field_name, :old_value, :new_value)',
+        [
+            'item_id' => $itemId,
+            'changed_by' => $changedBy,
+            'field_name' => $fieldName,
+            'old_value' => $oldValue,
+            'new_value' => $newValue,
+        ]
+    );
+}
+
+foreach ($items as $index => $item) {
+    $itemId = $itemIds[$item['title']];
+    $seed = ($index + 1) * 41;
+    $reach = 1400 + $seed * 9;
+    $engagement = 120 + $seed;
+    $clicks = 32 + ($seed % 37);
+    $impressions = (int) round($reach * 1.6);
+    $saves = (int) round($engagement * 0.2);
+    $shares = (int) round($engagement * 0.12);
+
+    q(
+        $pdo,
+        'INSERT INTO post_metrics (calendar_item_id, metric_date, reach, engagement, clicks, impressions, saves, shares)
+         VALUES (:item_id, :metric_date, :reach, :engagement, :clicks, :impressions, :saves, :shares)',
+        [
+            'item_id' => $itemId,
+            'metric_date' => $item['date'],
+            'reach' => $reach,
+            'engagement' => $engagement,
+            'clicks' => $clicks,
+            'impressions' => $impressions,
+            'saves' => $saves,
+            'shares' => $shares,
         ]
     );
 }
