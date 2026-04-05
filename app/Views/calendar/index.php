@@ -12,7 +12,7 @@ $rangeTitle = $viewMode === 'weekly'
 $title = 'Content Calendar';
 $subtitle = $rangeTitle . ' - ' . $monthData['total_posts'] . ' posts';
 $pageActions = [
-    ['label' => 'Create Calendar', 'href' => $config['app']['base_url'] . '/index.php?route=wizard', 'class' => 'btn-secondary', 'icon' => 'plus'],
+    ['label' => 'Calendar Wizard', 'href' => $config['app']['base_url'] . '/index.php?route=wizard.calendar', 'class' => 'btn-secondary', 'icon' => 'plus'],
     ['label' => 'Bulk Wizard', 'href' => $config['app']['base_url'] . '/index.php?route=wizard', 'class' => 'btn-primary', 'icon' => 'calendar'],
 ];
 require dirname(__DIR__) . '/partials/page-header.php';
@@ -151,7 +151,17 @@ $calendarBaseQuery = [
             </div>
         </div>
 
-        <?php if ($viewMode === 'monthly'): ?>
+        <?php if ($items === []): ?>
+            <?php
+            $emptyTitle = 'No posts are scheduled in this range';
+            $emptyMessage = 'Create the calendar first, then use the Bulk Wizard to generate posts with smart defaults and repeating patterns.';
+            $emptyActions = [
+                ['label' => 'Open Calendar Wizard', 'href' => $config['app']['base_url'] . '/index.php?route=wizard.calendar', 'class' => 'btn-secondary'],
+                ['label' => 'Open Bulk Wizard', 'href' => $config['app']['base_url'] . '/index.php?route=wizard', 'class' => 'btn-primary'],
+            ];
+            require dirname(__DIR__) . '/partials/empty-state.php';
+            ?>
+        <?php elseif ($viewMode === 'monthly'): ?>
             <div class="calendar-grid calendar-grid-labels">
                 <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
             </div>

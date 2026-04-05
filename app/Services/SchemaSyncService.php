@@ -10,14 +10,75 @@ final class SchemaSyncService
 {
     public static function sync(): void
     {
+        self::ensureClientWizardColumns();
+        self::ensureCalendarWizardColumns();
+        self::ensureItemWizardColumns();
         self::ensureEditHistoryTable();
         self::ensureMetricsTable();
         self::ensureWorkspaceSettingsTable();
         self::ensureReportRunsTable();
         self::ensureIntegrationSyncLogTable();
+        self::ensureWizardDraftsTable();
         self::migratePendingApprovalStatus();
         self::seedMissingMetrics();
         self::seedDefaultSettings();
+    }
+
+    private static function ensureClientWizardColumns(): void
+    {
+        $columns = [
+            'account_owner_employee_id' => "ALTER TABLE clients ADD COLUMN account_owner_employee_id INT UNSIGNED NULL AFTER client_user_id",
+            'workflow_preferences' => "ALTER TABLE clients ADD COLUMN workflow_preferences TEXT NULL AFTER status",
+            'approval_turnaround' => "ALTER TABLE clients ADD COLUMN approval_turnaround VARCHAR(120) NULL AFTER workflow_preferences",
+            'brand_notes' => "ALTER TABLE clients ADD COLUMN brand_notes TEXT NULL AFTER approval_turnaround",
+            'naming_conventions' => "ALTER TABLE clients ADD COLUMN naming_conventions TEXT NULL AFTER brand_notes",
+        ];
+
+        foreach ($columns as $name => $sql) {
+            if (!Database::fetch("SHOW COLUMNS FROM clients LIKE '{$name}'")) {
+                Database::query($sql);
+            }
+        }
+
+        if (!Database::fetch("SHOW INDEX FROM clients WHERE Key_name = 'idx_clients_account_owner'")) {
+            Database::query('ALTER TABLE clients ADD INDEX idx_clients_account_owner (account_owner_employee_id)');
+        }
+
+        if (!Database::fetch("SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients' AND COLUMN_NAME = 'account_owner_employee_id' AND REFERENCED_TABLE_NAME = 'users'")) {
+            Database::query('ALTER TABLE clients ADD CONSTRAINT fk_clients_account_owner FOREIGN KEY (account_owner_employee_id) REFERENCES users(id) ON DELETE SET NULL');
+        }
+    }
+
+    private static function ensureCalendarWizardColumns(): void
+    {
+        $columns = [
+            'campaign_name' => "ALTER TABLE calendars ADD COLUMN campaign_name VARCHAR(120) NULL AFTER title",
+            'notes' => "ALTER TABLE calendars ADD COLUMN notes TEXT NULL AFTER status",
+            'creation_mode' => "ALTER TABLE calendars ADD COLUMN creation_mode VARCHAR(60) NULL AFTER notes",
+            'posting_frequency' => "ALTER TABLE calendars ADD COLUMN posting_frequency VARCHAR(80) NULL AFTER creation_mode",
+            'primary_platforms' => "ALTER TABLE calendars ADD COLUMN primary_platforms VARCHAR(255) NULL AFTER posting_frequency",
+            'approval_timeline' => "ALTER TABLE calendars ADD COLUMN approval_timeline VARCHAR(120) NULL AFTER primary_platforms",
+        ];
+
+        foreach ($columns as $name => $sql) {
+            if (!Database::fetch("SHOW COLUMNS FROM calendars LIKE '{$name}'")) {
+                Database::query($sql);
+            }
+        }
+    }
+
+    private static function ensureItemWizardColumns(): void
+    {
+        $columns = [
+            'priority' => "ALTER TABLE calendar_items ADD COLUMN priority VARCHAR(30) NULL AFTER cta",
+            'approval_route' => "ALTER TABLE calendar_items ADD COLUMN approval_route VARCHAR(80) NULL AFTER priority",
+        ];
+
+        foreach ($columns as $name => $sql) {
+            if (!Database::fetch("SHOW COLUMNS FROM calendar_items LIKE '{$name}'")) {
+                Database::query($sql);
+            }
+        }
     }
 
     private static function ensureEditHistoryTable(): void
@@ -191,6 +252,25 @@ final class SchemaSyncService
         );
     }
 
+    private static function ensureWizardDraftsTable(): void
+    {
+        Database::query(
+            "CREATE TABLE IF NOT EXISTS wizard_drafts (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                wizard_key VARCHAR(80) NOT NULL,
+                user_id INT UNSIGNED NOT NULL,
+                draft_title VARCHAR(150) NULL,
+                draft_payload LONGTEXT NULL,
+                status VARCHAR(30) NOT NULL DEFAULT 'draft',
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_wizard_user_key (wizard_key, user_id),
+                INDEX idx_wizard_drafts_updated (updated_at),
+                CONSTRAINT fk_wizard_drafts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+    }
+
     private static function seedDefaultSettings(): void
     {
         $defaults = [
@@ -208,6 +288,8 @@ final class SchemaSyncService
             'integrations.tiktok.api_key' => '',
             'integrations.x.enabled' => '0',
             'integrations.x.api_key' => '',
+            'wizard.default_approval_turnaround' => '48 hours',
+            'wizard.default_posting_frequency' => '3 posts per week',
         ];
 
         foreach ($defaults as $key => $value) {

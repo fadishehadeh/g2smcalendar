@@ -166,19 +166,20 @@ document.addEventListener('DOMContentLoaded', () => {
         syncBulkState();
     }
 
-    const clientReviewForm = document.querySelector('[data-client-review-form]');
+    const clientReviewForm = document.querySelector('[data-client-review-form], [data-client-guided-review]');
     const clientReviewComment = document.querySelector('[data-client-review-comment]');
     if (clientReviewForm && clientReviewComment) {
         clientReviewForm.addEventListener('submit', (event) => {
             const submitter = event.submitter;
-            const action = submitter?.value || '';
-            const isRejected = action === 'Rejected';
+            const action = submitter?.value || submitter?.getAttribute('value') || '';
+            const selectedAction = clientReviewForm.querySelector('input[name="review_action"]:checked')?.value || '';
+            const isRejected = action === 'Rejected' || selectedAction === 'request_changes';
             clientReviewComment.required = isRejected;
 
             if (isRejected && !clientReviewComment.value.trim()) {
                 event.preventDefault();
                 clientReviewComment.focus();
-                alert('Rejection requires a note.');
+                alert('Requesting changes requires a short note.');
             }
         });
     }
@@ -250,6 +251,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const wizard = document.querySelector('[data-wizard]');
     if (wizard) {
+        const draftNode = document.querySelector('[data-wizard-draft="bulk-posts"]');
+        let bulkDraft = {};
+        try {
+            bulkDraft = draftNode ? JSON.parse(draftNode.textContent || '{}') : {};
+        } catch (error) {
+            bulkDraft = {};
+        }
         const form = wizard.querySelector('[data-wizard-form]');
         const monthInput = wizard.querySelector('[data-wizard-month]');
         const yearInput = wizard.querySelector('[data-wizard-year]');
@@ -419,7 +427,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 .join('');
 
             const hasPrevious = options.some((option) => option.value === previousValue);
-            artworkSizeInput.value = hasPrevious ? previousValue : options[0].value;
+            const draftValue = artworkSizeInput.getAttribute('data-default-value') || '';
+            if (!hasPrevious && draftValue && options.some((option) => option.value === draftValue)) {
+                artworkSizeInput.value = draftValue;
+            } else {
+                artworkSizeInput.value = hasPrevious ? previousValue : options[0].value;
+            }
         };
 
         const syncHiddenChannelInputs = () => {
@@ -538,6 +551,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const rows = channelData[day].map((row) => `<li>${row.quantity} x ${row.platform || 'Channel'} ${row.postType || 'Post'}</li>`).join('');
                 return `<article class="wizard-review-card"><h3>${day} ${monthNames[Number(monthInput.value) - 1]}</h3><ul>${rows}</ul></article>`;
             }).join('');
+            const total = selectedDates.reduce((sum, day) => {
+                ensureChannelRows(day);
+                return sum + channelData[day].reduce((carry, row) => carry + Math.max(1, Number(row.quantity || 1)), 0);
+            }, 0);
+            const totalNode = wizard.querySelector('[data-generated-total]');
+            if (totalNode) {
+                totalNode.textContent = `${total} post${total === 1 ? '' : 's'}`;
+            }
         };
 
         const renderCalendar = () => {
@@ -582,6 +603,14 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const validateStep = () => {
+            if (activeStep === 1) {
+                const clientSelect = form.querySelector('select[name="client_id"]');
+                if (clientSelect && !clientSelect.value) {
+                    alert('Choose a client before continuing.');
+                    clientSelect.focus();
+                    return false;
+                }
+            }
             if (activeStep === 2 && selectedDates.length === 0) {
                 alert('Select at least one date.');
                 return false;
@@ -676,9 +705,167 @@ document.addEventListener('DOMContentLoaded', () => {
             syncHiddenChannelInputs();
         });
 
+        if (bulkDraft.selected_dates) {
+            selectedDates = String(bulkDraft.selected_dates)
+                .split(',')
+                .map((value) => Number(value))
+                .filter((value) => value > 0);
+        }
+        Object.keys(bulkDraft.platforms || {}).forEach((day) => {
+            const rows = [];
+            const platforms = bulkDraft.platforms?.[day] || [];
+            const postTypes = bulkDraft.post_types?.[day] || [];
+            const quantities = bulkDraft.quantities?.[day] || [];
+            platforms.forEach((platform, index) => {
+                rows.push({
+                    platform: platform || 'Instagram',
+                    postType: postTypes[index] || 'Post',
+                    quantity: Math.max(1, Number(quantities[index] || 1)),
+                });
+            });
+            if (rows.length) {
+                channelData[day] = rows;
+            }
+        });
+
         renderCalendar();
         syncSelectedDates();
         updateArtworkSizeOptions();
         updateStep();
     }
+
+    document.querySelectorAll('[data-flow-wizard]').forEach((flowWizard) => {
+        const panels = [...flowWizard.querySelectorAll('[data-step-panel]')];
+        const steps = [...document.querySelectorAll('[data-step-nav]')].filter((node) => flowWizard.contains(node) || node.parentElement?.nextElementSibling === flowWizard);
+        const backBtn = flowWizard.querySelector('[data-step-back]');
+        const nextBtn = flowWizard.querySelector('[data-step-next]');
+        const submitBtn = flowWizard.querySelector('[data-step-submit]');
+        const summaryRoot = flowWizard.querySelector('[data-summary-root]');
+        const form = flowWizard.querySelector('[data-wizard-form]');
+        let activeStep = 1;
+
+        const collectSummary = () => {
+            if (!summaryRoot || !form) {
+                return;
+            }
+
+            const summary = [];
+            [...form.querySelectorAll('input, select, textarea')].forEach((field) => {
+                const name = field.name || '';
+                if (!name || name === '_csrf' || name === 'intent' || name === 'logo' || field.type === 'hidden') {
+                    return;
+                }
+                if ((field.type === 'checkbox' || field.type === 'radio') && !field.checked) {
+                    return;
+                }
+
+                const labelNode = field.closest('label')?.querySelector('span');
+                const label = labelNode ? labelNode.textContent.trim() : name.replace(/[_\[\]]+/g, ' ');
+                const value = field.tagName === 'SELECT'
+                    ? (field.selectedOptions[0]?.textContent || field.value)
+                    : field.value;
+
+                if (!value) {
+                    return;
+                }
+
+                const existing = summary.find((entry) => entry.label === label);
+                if (existing) {
+                    existing.value += `, ${value}`;
+                } else {
+                    summary.push({ label, value });
+                }
+            });
+
+            summaryRoot.innerHTML = summary.map((entry) => `
+                <div>
+                    <span>${entry.label}</span>
+                    <strong>${entry.value}</strong>
+                </div>
+            `).join('');
+        };
+
+        const validatePanel = () => {
+            const panel = panels[activeStep - 1];
+            if (!panel) {
+                return true;
+            }
+
+            const required = [...panel.querySelectorAll('[required]')];
+            for (const field of required) {
+                if ((field.type === 'checkbox' || field.type === 'radio')) {
+                    if (!field.checked) {
+                        field.focus();
+                        alert('Complete the required confirmations before continuing.');
+                        return false;
+                    }
+                    continue;
+                }
+
+                if (!String(field.value || '').trim()) {
+                    field.focus();
+                    alert('Please complete the required fields before continuing.');
+                    return false;
+                }
+            }
+
+            return true;
+        };
+
+        const syncStep = () => {
+            panels.forEach((panel, index) => panel.classList.toggle('is-active', index + 1 === activeStep));
+            steps.forEach((step, index) => step.classList.toggle('is-active', index + 1 === activeStep));
+            if (backBtn) {
+                backBtn.hidden = activeStep === 1;
+            }
+            if (nextBtn) {
+                nextBtn.hidden = activeStep === panels.length;
+            }
+            if (submitBtn) {
+                submitBtn.hidden = activeStep !== panels.length;
+            }
+            collectSummary();
+        };
+
+        if (backBtn) {
+            backBtn.addEventListener('click', () => {
+                activeStep = Math.max(1, activeStep - 1);
+                syncStep();
+            });
+        }
+
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                if (!validatePanel()) {
+                    return;
+                }
+                activeStep = Math.min(panels.length, activeStep + 1);
+                syncStep();
+            });
+        }
+
+        steps.forEach((step, index) => {
+            step.addEventListener('click', () => {
+                if (index + 1 <= activeStep || validatePanel()) {
+                    activeStep = index + 1;
+                    syncStep();
+                }
+            });
+        });
+
+        if (form) {
+            form.addEventListener('change', collectSummary);
+            form.addEventListener('input', collectSummary);
+            form.addEventListener('submit', (event) => {
+                if (event.submitter?.matches('[data-save-draft]')) {
+                    return;
+                }
+                if (!validatePanel()) {
+                    event.preventDefault();
+                }
+            });
+        }
+
+        syncStep();
+    });
 });

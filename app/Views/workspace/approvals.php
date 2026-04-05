@@ -26,6 +26,16 @@ foreach ($items as $item) {
 }
 ?>
 <section class="approval-grid">
+    <?php if ($items === []): ?>
+        <?php
+        $emptyTitle = 'No approvals are waiting right now';
+        $emptyMessage = 'When artwork is ready, use the Submit for Approval wizard from a post detail page. It checks missing fields before anything reaches the client.';
+        $emptyActions = [
+            ['label' => 'Open Calendar', 'href' => $config['app']['base_url'] . '/index.php?route=calendar', 'class' => 'btn-secondary'],
+        ];
+        require dirname(__DIR__) . '/partials/empty-state.php';
+        ?>
+    <?php endif; ?>
     <?php foreach ($items as $item): ?>
         <article class="approval-card">
             <button class="approval-preview approval-preview-image" type="button" data-item-id="<?= (int) $item['id'] ?>" data-item-source="quick">
@@ -50,19 +60,7 @@ foreach ($items as $item) {
             </div>
             <div class="approval-actions">
                 <?php if ($canApprove): ?>
-                    <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar.status">
-                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
-                        <input type="hidden" name="item_id" value="<?= (int) $item['id'] ?>">
-                        <input type="hidden" name="status" value="Approved">
-                        <button class="btn btn-success-soft" type="submit">Approve</button>
-                    </form>
-                    <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar.status">
-                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
-                        <input type="hidden" name="item_id" value="<?= (int) $item['id'] ?>">
-                        <input type="hidden" name="status" value="Rejected">
-                        <input type="hidden" name="comment" value="Needs revisions.">
-                        <button class="btn btn-danger-soft" type="submit">Reject</button>
-                    </form>
+                    <a class="btn btn-primary" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=approval.review&item_id=<?= (int) $item['id'] ?>">Guided Review</a>
                 <?php else: ?>
                     <a class="btn btn-secondary" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar.item&item_id=<?= (int) $item['id'] ?>">Open Item</a>
                 <?php endif; ?>

@@ -170,14 +170,8 @@ usort($timeline, static function (array $a, array $b): int {
                 <div class="detail-section">
                     <h4>Send To Client</h4>
                     <?php if ($latestPreviewFileId && in_array($item['status'], ['Draft', 'In Progress', 'Rejected', 'Revision Requested'], true)): ?>
-                        <p>Latest artwork is uploaded. Send it to the client review queue in one click.</p>
-                        <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar.status" class="stack compact">
-                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
-                            <input type="hidden" name="item_id" value="<?= (int) $item['id'] ?>">
-                            <input type="hidden" name="status" value="Pending Approval">
-                            <textarea name="comment" placeholder="Optional note for the client review email or internal handoff"></textarea>
-                            <button class="btn btn-primary" type="submit">Send Artwork For Pending Approval</button>
-                        </form>
+                        <p>Latest artwork is uploaded. Use the guided submission flow to check missing fields before it reaches the client.</p>
+                        <a class="btn btn-primary" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=wizard.approval&item_id=<?= (int) $item['id'] ?>">Open Submit for Approval Wizard</a>
                     <?php elseif (!$latestPreviewFileId): ?>
                         <p class="muted">Upload artwork first, then this one-click send action will be available.</p>
                     <?php else: ?>
@@ -298,20 +292,8 @@ usort($timeline, static function (array $a, array $b): int {
         <div class="detail-section">
             <h4><?= $canApprove ? 'Approval Action' : 'Workflow Action' ?></h4>
             <?php if ($roleName === 'client'): ?>
-                <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar.status" class="stack compact" data-client-review-form>
-                    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
-                    <input type="hidden" name="item_id" value="<?= (int) $item['id'] ?>">
-                    <textarea
-                        name="comment"
-                        data-client-review-comment
-                        placeholder="Add a note for approval or rejection. Required if you reject."
-                    ></textarea>
-                    <small class="muted">Use this one note field for approval feedback or rejection reason. A rejection note is required.</small>
-                    <div class="page-actions">
-                        <button class="btn btn-primary" type="submit" name="status" value="Approved">Approve</button>
-                        <button class="btn btn-danger-soft" type="submit" name="status" value="Rejected" data-client-reject>Reject</button>
-                    </div>
-                </form>
+                <p>Use the guided client review flow for the simplest approve or request-changes experience.</p>
+                <a class="btn btn-primary" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=approval.review&item_id=<?= (int) $item['id'] ?>">Open Guided Review</a>
             <?php else: ?>
                 <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar.status" class="stack compact">
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">

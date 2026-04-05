@@ -29,10 +29,16 @@ CREATE TABLE clients (
     contact_phone VARCHAR(50) NULL,
     logo_path VARCHAR(255) NULL,
     client_user_id INT UNSIGNED NULL,
+    account_owner_employee_id INT UNSIGNED NULL,
     status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+    workflow_preferences TEXT NULL,
+    approval_turnaround VARCHAR(120) NULL,
+    brand_notes TEXT NULL,
+    naming_conventions TEXT NULL,
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_clients_user FOREIGN KEY (client_user_id) REFERENCES users(id) ON DELETE SET NULL
+    CONSTRAINT fk_clients_user FOREIGN KEY (client_user_id) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT fk_clients_account_owner FOREIGN KEY (account_owner_employee_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE employee_client_assignments (
@@ -48,11 +54,17 @@ CREATE TABLE employee_client_assignments (
 CREATE TABLE calendars (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(150) NOT NULL,
+    campaign_name VARCHAR(120) NULL,
     client_id INT UNSIGNED NOT NULL,
     assigned_employee_id INT UNSIGNED NOT NULL,
     month TINYINT UNSIGNED NOT NULL,
     year SMALLINT UNSIGNED NOT NULL,
     status ENUM('draft', 'active', 'completed', 'archived') NOT NULL DEFAULT 'draft',
+    notes TEXT NULL,
+    creation_mode VARCHAR(60) NULL,
+    posting_frequency VARCHAR(80) NULL,
+    primary_platforms VARCHAR(255) NULL,
+    approval_timeline VARCHAR(120) NULL,
     created_by INT UNSIGNED NOT NULL,
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -81,6 +93,8 @@ CREATE TABLE calendar_items (
     campaign VARCHAR(100) NULL,
     content_pillar VARCHAR(100) NULL,
     cta VARCHAR(100) NULL,
+    priority VARCHAR(30) NULL,
+    approval_route VARCHAR(80) NULL,
     artwork_path VARCHAR(255) NULL,
     artwork_thumbnail_path VARCHAR(255) NULL,
     version_number INT UNSIGNED NOT NULL DEFAULT 1,
@@ -204,6 +218,20 @@ CREATE TABLE integration_sync_logs (
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_integration_sync_logs_created (created_at),
     CONSTRAINT fk_integration_sync_logs_user FOREIGN KEY (triggered_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE wizard_drafts (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    wizard_key VARCHAR(80) NOT NULL,
+    user_id INT UNSIGNED NOT NULL,
+    draft_title VARCHAR(150) NULL,
+    draft_payload LONGTEXT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'draft',
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_wizard_user_key (wizard_key, user_id),
+    INDEX idx_wizard_drafts_updated (updated_at),
+    CONSTRAINT fk_wizard_drafts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE notifications (

@@ -4,7 +4,7 @@ use App\Core\Ui;
 
 require dirname(__DIR__) . '/partials/header.php';
 $pageActions = [
-    ['label' => 'Add Client', 'href' => '#client-form', 'class' => 'btn-primary', 'icon' => 'plus'],
+    ['label' => 'Client Wizard', 'href' => $config['app']['base_url'] . '/index.php?route=wizard.client', 'class' => 'btn-primary', 'icon' => 'plus'],
 ];
 $title = 'Clients';
 $subtitle = count($clients) . ' registered client accounts across the workspace.';
@@ -21,40 +21,52 @@ require dirname(__DIR__) . '/partials/page-header.php';
     </form>
 </section>
 
-<section class="entity-grid">
-    <?php foreach ($clients as $client): ?>
-        <article class="entity-card">
-            <div class="entity-card-head">
-                <div class="entity-summary">
-                    <span class="avatar avatar-soft"><?= htmlspecialchars(Ui::initials($client['company_name'])) ?></span>
-                    <div>
-                        <h3><?= htmlspecialchars($client['company_name']) ?></h3>
-                        <p><?= htmlspecialchars($client['contact_name']) ?></p>
+<?php if ($clients === []): ?>
+    <?php
+    $emptyTitle = 'No clients have been added yet';
+    $emptyMessage = 'Start with the Client Onboarding Wizard. It guides you through contact details, account ownership, and workflow setup.';
+    $emptyActions = [
+        ['label' => 'Open Client Wizard', 'href' => $config['app']['base_url'] . '/index.php?route=wizard.client', 'class' => 'btn-primary'],
+    ];
+    require dirname(__DIR__) . '/partials/empty-state.php';
+    ?>
+<?php else: ?>
+    <section class="entity-grid">
+        <?php foreach ($clients as $client): ?>
+            <article class="entity-card">
+                <div class="entity-card-head">
+                    <div class="entity-summary">
+                        <span class="avatar avatar-soft"><?= htmlspecialchars(Ui::initials($client['company_name'])) ?></span>
+                        <div>
+                            <h3><?= htmlspecialchars($client['company_name']) ?></h3>
+                            <p><?= htmlspecialchars($client['contact_name']) ?></p>
+                        </div>
                     </div>
+                    <span class="status-badge <?= Ui::statusClass($client['status']) ?>"><?= htmlspecialchars(ucfirst($client['status'])) ?></span>
                 </div>
-                <span class="status-badge <?= Ui::statusClass($client['status']) ?>"><?= htmlspecialchars(ucfirst($client['status'])) ?></span>
-            </div>
-            <dl class="entity-meta">
-                <div><dt>Email</dt><dd><?= htmlspecialchars($client['contact_email']) ?></dd></div>
-                <div><dt>Calendars</dt><dd><?= (int) $client['calendars_count'] ?></dd></div>
-                <div><dt>Employees</dt><dd><?= (int) $client['employees_count'] ?></dd></div>
-            </dl>
-            <div class="entity-actions">
-                <a class="btn btn-secondary" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar&client_id=<?= (int) $client['id'] ?>">View</a>
-                <a class="btn btn-secondary" href="#client-form">Edit</a>
-            </div>
-        </article>
-    <?php endforeach; ?>
-</section>
+                <dl class="entity-meta">
+                    <div><dt>Email</dt><dd><?= htmlspecialchars($client['contact_email']) ?></dd></div>
+                    <div><dt>Calendars</dt><dd><?= (int) $client['calendars_count'] ?></dd></div>
+                    <div><dt>Employees</dt><dd><?= (int) $client['employees_count'] ?></dd></div>
+                </dl>
+                <div class="entity-actions">
+                    <a class="btn btn-secondary" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar&client_id=<?= (int) $client['id'] ?>">View</a>
+                    <a class="btn btn-secondary" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=wizard.client">Add Another</a>
+                </div>
+            </article>
+        <?php endforeach; ?>
+    </section>
+<?php endif; ?>
 
 <?php if (($authUser['role_name'] ?? '') === 'master_admin'): ?>
 <section class="card form-card" id="client-form">
     <div class="card-head">
         <div>
             <h3>Add Client</h3>
-            <p>Create a client profile and assign employees.</p>
+            <p>Quick create is still available. For non-technical users, the guided Client Wizard is recommended.</p>
         </div>
     </div>
+    <div class="helper-block">Recommended path: use the Client Wizard to create the client, assign the account owner, and save workflow preferences in one flow.</div>
     <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=clients.store" class="form-grid">
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
         <label><span>Company Name</span><input name="company_name" required></label>

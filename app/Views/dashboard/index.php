@@ -5,12 +5,11 @@ use App\Core\Ui;
 require dirname(__DIR__) . '/partials/header.php';
 $roleName = $authUser['role_name'] ?? '';
 $isClient = $roleName === 'client';
-$isEmployee = $roleName === 'employee';
 $isAdmin = $roleName === 'master_admin';
 
 $pageActions = [
     ['label' => 'View Calendar', 'href' => $config['app']['base_url'] . '/index.php?route=calendar', 'class' => 'btn-secondary', 'icon' => 'calendar'],
-    ['label' => 'New Calendar', 'href' => $config['app']['base_url'] . '/index.php?route=wizard', 'class' => 'btn-primary', 'icon' => 'plus'],
+    ['label' => 'New Calendar', 'href' => $config['app']['base_url'] . '/index.php?route=wizard.calendar', 'class' => 'btn-primary', 'icon' => 'plus'],
 ];
 
 if ($isClient) {
@@ -73,6 +72,39 @@ foreach ($pendingItems as $item) {
     <?php endforeach; ?>
 </section>
 
+<?php if (!$isClient): ?>
+<section class="dashboard-quick-actions" style="margin-bottom:20px;">
+    <?php if ($isAdmin): ?>
+    <a class="quick-action-card" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=wizard.client">
+        <strong>Add Client</strong>
+        <p>Guided setup for contacts, ownership, and workflow preferences.</p>
+    </a>
+    <?php endif; ?>
+    <a class="quick-action-card" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=wizard.calendar">
+        <strong>Create Calendar</strong>
+        <p>Set up the month first, then move into post creation with recommended next steps.</p>
+    </a>
+    <a class="quick-action-card" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=wizard">
+        <strong>Launch Bulk Wizard</strong>
+        <p>Build many posts using dates, repeated weekly patterns, and shared defaults.</p>
+    </a>
+    <a class="quick-action-card" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=approvals">
+        <strong>Review Approvals</strong>
+        <p>Track items waiting on client feedback or open guided review flows.</p>
+    </a>
+    <a class="quick-action-card" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=reports">
+        <strong>Generate Report</strong>
+        <p>Create a report from analytics, approvals, downloads, and activity.</p>
+    </a>
+    <?php if ($isAdmin): ?>
+    <a class="quick-action-card" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=integrations">
+        <strong>Integration Setup</strong>
+        <p>Configure AI and analytics providers with guided setup screens.</p>
+    </a>
+    <?php endif; ?>
+</section>
+<?php endif; ?>
+
 <section class="dashboard-grid">
     <article class="card">
         <div class="card-head">
@@ -82,27 +114,39 @@ foreach ($pendingItems as $item) {
             </div>
         </div>
         <div class="action-list">
-            <?php foreach ($pendingItems as $item): ?>
-                <button class="action-card" type="button" data-item-id="<?= (int) $item['id'] ?>" data-item-source="quick">
-                    <div class="action-card-media">
-                        <?php if (!empty($item['preview_file_id'])): ?>
-                            <?php if (Ui::mediaKind($item['preview_mime_type'] ?? '') === 'video'): ?>
-                                <video src="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=preview.file&file_id=<?= (int) $item['preview_file_id'] ?>" muted playsinline preload="metadata"></video>
-                            <?php else: ?>
-                                <img src="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=preview.file&file_id=<?= (int) $item['preview_file_id'] ?>" alt="<?= htmlspecialchars($item['title']) ?>">
+            <?php if ($pendingItems === []): ?>
+                <?php
+                $emptyTitle = 'No urgent actions are waiting';
+                $emptyMessage = 'This area will show pending approvals and revision items. For now, the next useful step is to create a calendar or generate posts.';
+                $emptyActions = [
+                    ['label' => 'Create Calendar', 'href' => $config['app']['base_url'] . '/index.php?route=wizard.calendar', 'class' => 'btn-secondary'],
+                    ['label' => 'Launch Bulk Wizard', 'href' => $config['app']['base_url'] . '/index.php?route=wizard', 'class' => 'btn-primary'],
+                ];
+                require dirname(__DIR__) . '/partials/empty-state.php';
+                ?>
+            <?php else: ?>
+                <?php foreach ($pendingItems as $item): ?>
+                    <button class="action-card" type="button" data-item-id="<?= (int) $item['id'] ?>" data-item-source="quick">
+                        <div class="action-card-media">
+                            <?php if (!empty($item['preview_file_id'])): ?>
+                                <?php if (Ui::mediaKind($item['preview_mime_type'] ?? '') === 'video'): ?>
+                                    <video src="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=preview.file&file_id=<?= (int) $item['preview_file_id'] ?>" muted playsinline preload="metadata"></video>
+                                <?php else: ?>
+                                    <img src="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=preview.file&file_id=<?= (int) $item['preview_file_id'] ?>" alt="<?= htmlspecialchars($item['title']) ?>">
+                                <?php endif; ?>
                             <?php endif; ?>
-                        <?php endif; ?>
-                    </div>
-                    <div class="action-card-copy">
-                        <div class="action-card-head">
-                            <strong><?= htmlspecialchars($item['title']) ?></strong>
-                            <span class="status-badge <?= Ui::statusClass($item['status']) ?>"><?= htmlspecialchars($item['status']) ?></span>
                         </div>
-                        <p><?= htmlspecialchars($item['company_name']) ?> · <?= htmlspecialchars($item['scheduled_date']) ?> · <?= htmlspecialchars($item['platform']) ?></p>
-                        <span class="text-link"><?= htmlspecialchars($item['action_label']) ?></span>
-                    </div>
-                </button>
-            <?php endforeach; ?>
+                        <div class="action-card-copy">
+                            <div class="action-card-head">
+                                <strong><?= htmlspecialchars($item['title']) ?></strong>
+                                <span class="status-badge <?= Ui::statusClass($item['status']) ?>"><?= htmlspecialchars($item['status']) ?></span>
+                            </div>
+                            <p><?= htmlspecialchars($item['company_name']) ?> - <?= htmlspecialchars($item['scheduled_date']) ?> - <?= htmlspecialchars($item['platform']) ?></p>
+                            <span class="text-link"><?= htmlspecialchars($item['action_label']) ?></span>
+                        </div>
+                    </button>
+                <?php endforeach; ?>
+            <?php endif; ?>
         </div>
     </article>
 
