@@ -38,4 +38,19 @@ $mailjetConfigured = !empty($mailer['mailjet']['api_key']) && !empty($mailer['ma
         </form>
     </article>
 </section>
+<section class="settings-grid" style="margin-top:18px;">
+    <article class="card">
+        <div class="card-head"><div><h3>Automation</h3><p>Reports, campaign tracking, and analytics operations.</p></div></div>
+        <div class="page-actions">
+            <a class="btn btn-secondary" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=campaigns">Open Campaigns</a>
+            <a class="btn btn-secondary" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=reports">Open Reports</a>
+        </div>
+    </article>
+    <article class="card">
+        <div class="card-head"><div><h3>Provider Setup</h3><p>Manage AI and analytics connections in one place.</p></div></div>
+        <div class="page-actions">
+            <a class="btn btn-primary" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=integrations">Open Integrations</a>
+        </div>
+    </article>
+</section>
 <?php require dirname(__DIR__) . '/partials/footer.php'; ?>

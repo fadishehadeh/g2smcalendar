@@ -9,7 +9,10 @@ use App\Core\Controller;
 use App\Core\Database;
 use App\Models\CalendarItem;
 use App\Services\ActivityLogger;
+use App\Services\IntegrationService;
 use App\Services\MailTransport;
+use App\Services\ReportService;
+use App\Services\WorkspaceSettingsService;
 use App\Services\WorkspaceService;
 use Throwable;
 
@@ -129,6 +132,117 @@ final class WorkspaceController extends Controller
             'posts' => $workspace->analyticsPosts($filters),
             'clients' => $workspace->clientCards(),
         ]);
+    }
+
+    public function campaigns(): void
+    {
+        Auth::requireRole(['master_admin', 'employee', 'client']);
+        $workspace = new WorkspaceService();
+        $filters = [
+            'client_id' => $_GET['client_id'] ?? '',
+        ];
+
+        $this->view('workspace/campaigns', [
+            'title' => 'Campaigns',
+            'filters' => $filters,
+            'campaigns' => $workspace->campaigns($filters),
+            'clients' => $workspace->clientCards(),
+        ]);
+    }
+
+    public function reports(): void
+    {
+        Auth::requireRole(['master_admin', 'employee']);
+        $workspace = new WorkspaceService();
+        $settings = new WorkspaceSettingsService();
+        $reports = new ReportService($this->config, $settings, $workspace);
+
+        $this->view('workspace/reports', [
+            'title' => 'Reports',
+            'clients' => $workspace->clientCards(),
+            'runs' => $reports->runs(),
+            'automation' => $reports->automationSettings(),
+        ]);
+    }
+
+    public function generateReport(): void
+    {
+        Auth::requireRole(['master_admin', 'employee']);
+        $workspace = new WorkspaceService();
+        $reports = new ReportService($this->config, new WorkspaceSettingsService(), $workspace);
+        $type = in_array((string) ($_POST['report_type'] ?? 'monthly'), ['weekly', 'monthly'], true) ? (string) $_POST['report_type'] : 'monthly';
+        $sendEmail = !empty($_POST['send_email']);
+        $reports->generate($type, [
+            'month' => $_POST['month'] ?? date('n'),
+            'year' => $_POST['year'] ?? date('Y'),
+            'client_id' => $_POST['client_id'] ?? '',
+            'platform' => $_POST['platform'] ?? '',
+            'recipient_email' => $_POST['recipient_email'] ?? '',
+        ], $sendEmail);
+        $this->flash('success', strtoupper($type) . ' report generated.');
+        $this->redirect('reports');
+    }
+
+    public function dispatchReports(): void
+    {
+        Auth::requireRole(['master_admin']);
+        $workspace = new WorkspaceService();
+        $reports = new ReportService($this->config, new WorkspaceSettingsService(), $workspace);
+        $count = $reports->dispatchDueReports();
+        $this->flash('success', $count . ' automated report(s) dispatched.');
+        $this->redirect('reports');
+    }
+
+    public function saveReportSettings(): void
+    {
+        Auth::requireRole(['master_admin']);
+        $workspace = new WorkspaceService();
+        $reports = new ReportService($this->config, new WorkspaceSettingsService(), $workspace);
+        $reports->saveAutomationSettings($_POST);
+        $this->flash('success', 'Report automation settings saved.');
+        $this->redirect('reports');
+    }
+
+    public function integrations(): void
+    {
+        Auth::requireRole(['master_admin']);
+        $service = new IntegrationService($this->config, new WorkspaceSettingsService());
+
+        $this->view('workspace/integrations', [
+            'title' => 'Integrations',
+            'providers' => $service->providers(),
+            'logs' => $service->logs(),
+        ]);
+    }
+
+    public function saveIntegration(): void
+    {
+        Auth::requireRole(['master_admin']);
+        $provider = trim((string) ($_POST['provider'] ?? ''));
+        $service = new IntegrationService($this->config, new WorkspaceSettingsService());
+        $service->saveProvider($provider, (string) ($_POST['enabled'] ?? '0'), (string) ($_POST['api_key'] ?? ''));
+        $this->flash('success', ucfirst($provider) . ' settings saved.');
+        $this->redirect('integrations');
+    }
+
+    public function testIntegration(): void
+    {
+        Auth::requireRole(['master_admin']);
+        $provider = trim((string) ($_POST['provider'] ?? ''));
+        $service = new IntegrationService($this->config, new WorkspaceSettingsService());
+        $result = $service->testProvider($provider);
+        $this->flash($result['status'] === 'success' ? 'success' : 'error', $result['message']);
+        $this->redirect('integrations');
+    }
+
+    public function syncIntegration(): void
+    {
+        Auth::requireRole(['master_admin']);
+        $provider = trim((string) ($_POST['provider'] ?? ''));
+        $service = new IntegrationService($this->config, new WorkspaceSettingsService());
+        $result = $service->syncMetrics($provider);
+        $this->flash($result['status'] === 'queued' ? 'success' : 'error', $result['message']);
+        $this->redirect('integrations');
     }
 
     public function artwork(): void

@@ -551,6 +551,38 @@ final class WorkspaceService
         );
     }
 
+    public function campaigns(array $filters = []): array
+    {
+        [$scope, $params] = $this->scope('ci.client_id');
+        $where = [$scope, "COALESCE(ci.campaign, '') <> ''"];
+
+        if (!empty($filters['client_id'])) {
+            $where[] = 'ci.client_id = :client_id';
+            $params['client_id'] = (int) $filters['client_id'];
+        }
+
+        return Database::fetchAll(
+            "SELECT
+                ci.campaign,
+                c.company_name,
+                COUNT(DISTINCT ci.id) AS posts_count,
+                MIN(ci.scheduled_date) AS first_post_date,
+                MAX(ci.scheduled_date) AS last_post_date,
+                SUM(CASE WHEN ci.status = 'Pending Approval' THEN 1 ELSE 0 END) AS pending_count,
+                SUM(CASE WHEN ci.status = 'Approved' THEN 1 ELSE 0 END) AS approved_count,
+                SUM(COALESCE(pm.reach, 0)) AS reach,
+                SUM(COALESCE(pm.engagement, 0)) AS engagement
+             FROM calendar_items ci
+             JOIN clients c ON c.id = ci.client_id
+             LEFT JOIN post_metrics pm ON pm.calendar_item_id = ci.id
+             WHERE " . implode(' AND ', $where) . "
+             GROUP BY ci.campaign, c.company_name
+             ORDER BY last_post_date DESC, ci.campaign ASC"
+            ,
+            $params
+        );
+    }
+
     private function weekDates(string $from): array
     {
         $days = [];

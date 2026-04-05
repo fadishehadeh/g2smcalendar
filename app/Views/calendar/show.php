@@ -266,6 +266,33 @@ usort($timeline, static function (array $a, array $b): int {
                     <button class="btn btn-primary" type="submit">Save Post Changes</button>
                 </form>
             </div>
+            <div class="detail-section">
+                <h4>AI Assistant</h4>
+                <div class="page-actions">
+                    <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar.ai-suggest">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
+                        <input type="hidden" name="item_id" value="<?= (int) $item['id'] ?>">
+                        <button class="btn btn-secondary" type="submit">Generate Caption + Best Time</button>
+                    </form>
+                    <?php if (!empty($aiSuggestion)): ?>
+                        <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar.ai-apply">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
+                            <input type="hidden" name="item_id" value="<?= (int) $item['id'] ?>">
+                            <button class="btn btn-primary" type="submit">Apply Suggestion</button>
+                        </form>
+                    <?php endif; ?>
+                </div>
+                <?php if (!empty($aiSuggestion)): ?>
+                    <div class="mini-comment" style="margin-top:12px;">
+                        <strong>Suggested Caption <small><?= htmlspecialchars((string) ($aiSuggestion['source'] ?? 'assistant')) ?></small></strong>
+                        <p><?= nl2br(htmlspecialchars((string) ($aiSuggestion['caption'] ?? ''))) ?></p>
+                        <p>Suggested Time: <?= htmlspecialchars((string) ($aiSuggestion['suggested_time'] ?? '-')) ?></p>
+                        <p><?= nl2br(htmlspecialchars((string) ($aiSuggestion['rationale'] ?? ''))) ?></p>
+                    </div>
+                <?php else: ?>
+                    <p class="muted">Generate AI caption suggestions and recommended posting times from the current post context.</p>
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
 
         <div class="detail-section">

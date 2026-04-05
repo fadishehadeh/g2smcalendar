@@ -117,6 +117,51 @@ q(
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
 );
 
+q(
+    $pdo,
+    "CREATE TABLE IF NOT EXISTS workspace_settings (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        setting_key VARCHAR(120) NOT NULL UNIQUE,
+        setting_value TEXT NULL,
+        updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+);
+
+q(
+    $pdo,
+    "CREATE TABLE IF NOT EXISTS report_runs (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        report_type ENUM('weekly', 'monthly') NOT NULL,
+        report_month TINYINT UNSIGNED NULL,
+        report_year SMALLINT UNSIGNED NULL,
+        period_start DATE NOT NULL,
+        period_end DATE NOT NULL,
+        generated_by INT UNSIGNED NULL,
+        recipient_email VARCHAR(190) NULL,
+        status VARCHAR(40) NOT NULL DEFAULT 'generated',
+        report_subject VARCHAR(190) NOT NULL,
+        report_body MEDIUMTEXT NOT NULL,
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_report_runs_created (created_at),
+        CONSTRAINT fk_report_runs_user FOREIGN KEY (generated_by) REFERENCES users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+);
+
+q(
+    $pdo,
+    "CREATE TABLE IF NOT EXISTS integration_sync_logs (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        provider VARCHAR(60) NOT NULL,
+        action VARCHAR(80) NOT NULL,
+        status VARCHAR(40) NOT NULL,
+        message TEXT NULL,
+        triggered_by INT UNSIGNED NULL,
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_integration_sync_logs_created (created_at),
+        CONSTRAINT fk_integration_sync_logs_user FOREIGN KEY (triggered_by) REFERENCES users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+);
+
 $artworks = [
     ['filename' => 'dukhan-campaign-1.svg', 'title' => 'Digital Banking Week', 'subtitle' => 'Campaign launch creative', 'primary' => '#8b1e1e', 'secondary' => '#d92d2a'],
     ['filename' => 'dukhan-campaign-2.svg', 'title' => 'Ramadan Savings Story', 'subtitle' => 'Story format visual', 'primary' => '#7c2d12', 'secondary' => '#ea580c'],
@@ -150,6 +195,8 @@ foreach ([
     'download_logs',
     'notifications',
     'post_metrics',
+    'integration_sync_logs',
+    'report_runs',
     'item_status_history',
     'item_edit_history',
     'item_comments',
@@ -365,6 +412,30 @@ foreach ($activityRows as [$userId, $action, $entityType, $entityId, $details]) 
             'details' => $details,
             'ip_address' => '127.0.0.1',
         ]
+    );
+}
+
+foreach ([
+    'reports.weekly.enabled' => '0',
+    'reports.weekly.recipient' => '',
+    'reports.monthly.enabled' => '1',
+    'reports.monthly.recipient' => 'client@g2.local',
+    'integrations.openai.enabled' => '0',
+    'integrations.openai.api_key' => '',
+    'integrations.meta.enabled' => '0',
+    'integrations.meta.api_key' => '',
+    'integrations.youtube.enabled' => '0',
+    'integrations.youtube.api_key' => '',
+    'integrations.tiktok.enabled' => '0',
+    'integrations.tiktok.api_key' => '',
+    'integrations.x.enabled' => '0',
+    'integrations.x.api_key' => '',
+] as $key => $value) {
+    q(
+        $pdo,
+        'INSERT INTO workspace_settings (setting_key, setting_value) VALUES (:setting_key, :setting_value)
+         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)',
+        ['setting_key' => $key, 'setting_value' => $value]
     );
 }
 

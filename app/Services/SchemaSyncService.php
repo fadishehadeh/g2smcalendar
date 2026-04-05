@@ -12,8 +12,12 @@ final class SchemaSyncService
     {
         self::ensureEditHistoryTable();
         self::ensureMetricsTable();
+        self::ensureWorkspaceSettingsTable();
+        self::ensureReportRunsTable();
+        self::ensureIntegrationSyncLogTable();
         self::migratePendingApprovalStatus();
         self::seedMissingMetrics();
+        self::seedDefaultSettings();
     }
 
     private static function ensureEditHistoryTable(): void
@@ -132,6 +136,84 @@ final class SchemaSyncService
                     'saves' => $saves,
                     'shares' => $shares,
                 ]
+            );
+        }
+    }
+
+    private static function ensureWorkspaceSettingsTable(): void
+    {
+        Database::query(
+            "CREATE TABLE IF NOT EXISTS workspace_settings (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                setting_key VARCHAR(120) NOT NULL UNIQUE,
+                setting_value TEXT NULL,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+    }
+
+    private static function ensureReportRunsTable(): void
+    {
+        Database::query(
+            "CREATE TABLE IF NOT EXISTS report_runs (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                report_type ENUM('weekly', 'monthly') NOT NULL,
+                report_month TINYINT UNSIGNED NULL,
+                report_year SMALLINT UNSIGNED NULL,
+                period_start DATE NOT NULL,
+                period_end DATE NOT NULL,
+                generated_by INT UNSIGNED NULL,
+                recipient_email VARCHAR(190) NULL,
+                status VARCHAR(40) NOT NULL DEFAULT 'generated',
+                report_subject VARCHAR(190) NOT NULL,
+                report_body MEDIUMTEXT NOT NULL,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_report_runs_created (created_at),
+                CONSTRAINT fk_report_runs_user FOREIGN KEY (generated_by) REFERENCES users(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+    }
+
+    private static function ensureIntegrationSyncLogTable(): void
+    {
+        Database::query(
+            "CREATE TABLE IF NOT EXISTS integration_sync_logs (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                provider VARCHAR(60) NOT NULL,
+                action VARCHAR(80) NOT NULL,
+                status VARCHAR(40) NOT NULL,
+                message TEXT NULL,
+                triggered_by INT UNSIGNED NULL,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_integration_sync_logs_created (created_at),
+                CONSTRAINT fk_integration_sync_logs_user FOREIGN KEY (triggered_by) REFERENCES users(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+    }
+
+    private static function seedDefaultSettings(): void
+    {
+        $defaults = [
+            'reports.weekly.enabled' => '0',
+            'reports.weekly.recipient' => '',
+            'reports.monthly.enabled' => '1',
+            'reports.monthly.recipient' => '',
+            'integrations.openai.enabled' => '0',
+            'integrations.openai.api_key' => '',
+            'integrations.meta.enabled' => '0',
+            'integrations.meta.api_key' => '',
+            'integrations.youtube.enabled' => '0',
+            'integrations.youtube.api_key' => '',
+            'integrations.tiktok.enabled' => '0',
+            'integrations.tiktok.api_key' => '',
+            'integrations.x.enabled' => '0',
+            'integrations.x.api_key' => '',
+        ];
+
+        foreach ($defaults as $key => $value) {
+            Database::query(
+                'INSERT IGNORE INTO workspace_settings (setting_key, setting_value) VALUES (:setting_key, :setting_value)',
+                ['setting_key' => $key, 'setting_value' => $value]
             );
         }
     }

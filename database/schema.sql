@@ -170,6 +170,42 @@ CREATE TABLE post_metrics (
     CONSTRAINT fk_post_metrics_item FOREIGN KEY (calendar_item_id) REFERENCES calendar_items(id) ON DELETE CASCADE
 );
 
+CREATE TABLE workspace_settings (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    setting_key VARCHAR(120) NOT NULL UNIQUE,
+    setting_value TEXT NULL,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE report_runs (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    report_type ENUM('weekly', 'monthly') NOT NULL,
+    report_month TINYINT UNSIGNED NULL,
+    report_year SMALLINT UNSIGNED NULL,
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    generated_by INT UNSIGNED NULL,
+    recipient_email VARCHAR(190) NULL,
+    status VARCHAR(40) NOT NULL DEFAULT 'generated',
+    report_subject VARCHAR(190) NOT NULL,
+    report_body MEDIUMTEXT NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_report_runs_created (created_at),
+    CONSTRAINT fk_report_runs_user FOREIGN KEY (generated_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE integration_sync_logs (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    provider VARCHAR(60) NOT NULL,
+    action VARCHAR(80) NOT NULL,
+    status VARCHAR(40) NOT NULL,
+    message TEXT NULL,
+    triggered_by INT UNSIGNED NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_integration_sync_logs_created (created_at),
+    CONSTRAINT fk_integration_sync_logs_user FOREIGN KEY (triggered_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
 CREATE TABLE notifications (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     user_id INT UNSIGNED NOT NULL,

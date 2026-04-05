@@ -18,10 +18,13 @@ $navItems = [
     ['route' => 'assignments', 'label' => 'Assignments', 'icon' => 'assignments', 'roles' => ['master_admin']],
     ['route' => 'posts', 'label' => 'All Posts', 'icon' => 'posts', 'roles' => ['master_admin', 'employee', 'client']],
     ['route' => 'analytics', 'label' => 'Analytics', 'icon' => 'trend', 'roles' => ['master_admin', 'employee', 'client']],
+    ['route' => 'campaigns', 'label' => 'Campaigns', 'icon' => 'clients', 'roles' => ['master_admin', 'employee', 'client']],
+    ['route' => 'reports', 'label' => 'Reports', 'icon' => 'activity', 'roles' => ['master_admin', 'employee']],
     ['route' => 'approvals', 'label' => 'Approvals', 'icon' => 'approvals', 'roles' => ['master_admin', 'employee', 'client']],
     ['route' => 'artwork', 'label' => 'Artwork Library', 'icon' => 'artwork', 'roles' => ['master_admin', 'employee', 'client']],
     ['route' => 'notifications', 'label' => 'Notifications', 'icon' => 'notifications', 'roles' => ['master_admin', 'employee', 'client']],
     ['route' => 'activity', 'label' => 'Activity Log', 'icon' => 'activity', 'roles' => ['master_admin', 'employee', 'client']],
+    ['route' => 'integrations', 'label' => 'Integrations', 'icon' => 'settings', 'roles' => ['master_admin']],
     ['route' => 'settings', 'label' => 'Settings', 'icon' => 'settings', 'roles' => ['master_admin']],
 ];
 ?>

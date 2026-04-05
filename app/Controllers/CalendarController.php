@@ -11,9 +11,11 @@ use App\Models\CalendarItem;
 use App\Models\Client;
 use App\Models\User;
 use App\Services\ActivityLogger;
+use App\Services\AiAssistService;
 use App\Services\DemoAssetService;
 use App\Services\NotificationService;
 use App\Services\UploadService;
+use App\Services\WorkspaceSettingsService;
 use App\Services\WorkspaceService;
 use Throwable;
 
@@ -82,6 +84,7 @@ final class CalendarController extends Controller
             'history' => $history,
             'activity' => $activity,
             'editHistory' => $editHistory,
+            'aiSuggestion' => $_SESSION['ai_suggestions'][$itemId] ?? null,
             'statuses' => CalendarItem::STATUSES,
         ]);
     }
@@ -369,6 +372,88 @@ final class CalendarController extends Controller
         }
 
         $this->flash('success', 'Comment added.');
+        $this->redirect('calendar.item', ['item_id' => $itemId]);
+    }
+
+    public function generateAiSuggestion(): void
+    {
+        Auth::requireRole(['master_admin', 'employee']);
+        $itemId = (int) ($_POST['item_id'] ?? 0);
+        $item = CalendarItem::find($itemId);
+
+        if (!$item || !CalendarItem::canAccess($item)) {
+            http_response_code(403);
+            exit('Forbidden');
+        }
+
+        $service = new AiAssistService($this->config, new WorkspaceSettingsService());
+        $suggestion = $service->generateCaptionSuggestion($item);
+        $_SESSION['ai_suggestions'][$itemId] = $suggestion;
+
+        ActivityLogger::log('ai_suggestion_generated', 'calendar_item', $itemId, ['source' => $suggestion['source'] ?? 'unknown']);
+        $this->flash('success', 'AI suggestion generated using ' . ($suggestion['source'] ?? 'assistant') . '.');
+        $this->redirect('calendar.item', ['item_id' => $itemId]);
+    }
+
+    public function applyAiSuggestion(): void
+    {
+        Auth::requireRole(['master_admin', 'employee']);
+        $itemId = (int) ($_POST['item_id'] ?? 0);
+        $item = CalendarItem::find($itemId);
+
+        if (!$item || !CalendarItem::canAccess($item)) {
+            http_response_code(403);
+            exit('Forbidden');
+        }
+
+        $suggestion = $_SESSION['ai_suggestions'][$itemId] ?? null;
+        if (!is_array($suggestion)) {
+            $this->flash('error', 'No AI suggestion is available to apply.');
+            $this->redirect('calendar.item', ['item_id' => $itemId]);
+        }
+
+        $oldCaption = trim((string) ($item['caption_en'] ?? ''));
+        $newCaption = trim((string) ($suggestion['caption'] ?? ''));
+        $newTime = trim((string) ($suggestion['suggested_time'] ?? ''));
+
+        Database::query(
+            'UPDATE calendar_items SET caption_en = :caption_en, scheduled_time = :scheduled_time WHERE id = :id',
+            [
+                'caption_en' => $newCaption,
+                'scheduled_time' => $newTime !== '' ? $newTime : null,
+                'id' => $itemId,
+            ]
+        );
+
+        if ($oldCaption !== $newCaption) {
+            Database::insert(
+                'INSERT INTO item_edit_history (calendar_item_id, changed_by, field_name, old_value, new_value)
+                 VALUES (:item, :user, :field_name, :old_value, :new_value)',
+                [
+                    'item' => $itemId,
+                    'user' => Auth::user()['id'],
+                    'field_name' => 'Caption (EN)',
+                    'old_value' => $oldCaption !== '' ? $oldCaption : null,
+                    'new_value' => $newCaption !== '' ? $newCaption : null,
+                ]
+            );
+        }
+
+        Database::insert(
+            'INSERT INTO item_edit_history (calendar_item_id, changed_by, field_name, old_value, new_value)
+             VALUES (:item, :user, :field_name, :old_value, :new_value)',
+            [
+                'item' => $itemId,
+                'user' => Auth::user()['id'],
+                'field_name' => 'Suggested Publish Time',
+                'old_value' => (string) ($item['scheduled_time'] ?? '') !== '' ? (string) $item['scheduled_time'] : null,
+                'new_value' => $newTime !== '' ? $newTime : null,
+            ]
+        );
+
+        ActivityLogger::log('ai_suggestion_applied', 'calendar_item', $itemId, ['source' => $suggestion['source'] ?? 'unknown']);
+        unset($_SESSION['ai_suggestions'][$itemId]);
+        $this->flash('success', 'AI suggestion applied to caption and schedule time.');
         $this->redirect('calendar.item', ['item_id' => $itemId]);
     }
 

@@ -30,4 +30,9 @@ return [
             'endpoint' => (string) $env('MAILJET_ENDPOINT', 'https://api.mailjet.com/v3.1/send'),
         ],
     ],
+    'openai' => [
+        'api_key' => (string) $env('OPENAI_API_KEY', ''),
+        'model' => (string) $env('OPENAI_MODEL', 'gpt-5'),
+        'endpoint' => (string) $env('OPENAI_ENDPOINT', 'https://api.openai.com/v1/responses'),
+    ],
 ];
