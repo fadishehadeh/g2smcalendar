@@ -100,6 +100,43 @@ foreach ($activity as $entry) {
 usort($timeline, static function (array $a, array $b): int {
     return strcmp((string) ($b['timestamp'] ?? ''), (string) ($a['timestamp'] ?? ''));
 });
+
+$clientFeedback = [];
+foreach ($comments as $comment) {
+    if (($comment['role_name'] ?? '') !== 'client') {
+        continue;
+    }
+
+    $clientFeedback[] = [
+        'author' => (string) ($comment['name'] ?? 'Client'),
+        'body' => (string) ($comment['comment'] ?? ''),
+        'timestamp' => (string) ($comment['created_at'] ?? ''),
+        'source' => 'Comment',
+    ];
+}
+
+foreach ($history as $entry) {
+    if (trim((string) ($entry['comment'] ?? '')) === '') {
+        continue;
+    }
+
+    $authorName = (string) ($entry['name'] ?? '');
+    $isClientAuthored = strcasecmp($authorName, (string) ($item['contact_name'] ?? '')) === 0;
+    if (!$isClientAuthored && ($roleName !== 'client')) {
+        continue;
+    }
+
+    $clientFeedback[] = [
+        'author' => $authorName !== '' ? $authorName : 'Client',
+        'body' => (string) $entry['comment'],
+        'timestamp' => (string) ($entry['created_at'] ?? ''),
+        'source' => 'Status Update',
+    ];
+}
+
+usort($clientFeedback, static function (array $a, array $b): int {
+    return strcmp((string) ($b['timestamp'] ?? ''), (string) ($a['timestamp'] ?? ''));
+});
 ?>
 
 <section class="item-detail-page">
@@ -337,6 +374,30 @@ usort($timeline, static function (array $a, array $b): int {
 </section>
 
 <section class="item-detail-grid">
+    <?php if ($roleName !== 'client'): ?>
+        <article class="card">
+            <div class="card-head">
+                <div>
+                    <h3>Client Feedback</h3>
+                    <p>Latest review comments and revision requests from the client.</p>
+                </div>
+            </div>
+            <div class="mini-list">
+                <?php if ($clientFeedback === []): ?>
+                    <div class="mini-comment"><p>No client feedback yet.</p></div>
+                <?php endif; ?>
+                <?php foreach ($clientFeedback as $entry): ?>
+                    <div class="mini-comment">
+                        <strong><?= htmlspecialchars($entry['author']) ?> <small><?= htmlspecialchars($entry['source']) ?></small></strong>
+                        <p><?= nl2br(htmlspecialchars($entry['body'])) ?></p>
+                        <?php if ($entry['timestamp'] !== ''): ?>
+                            <small><?= htmlspecialchars($entry['timestamp']) ?></small>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </article>
+    <?php endif; ?>
     <article class="card">
         <div class="card-head">
             <div>

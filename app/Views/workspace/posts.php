@@ -14,8 +14,8 @@ $pageActions = [
 ];
 require dirname(__DIR__) . '/partials/page-header.php';
 ?>
-<section class="toolbar-card">
-    <form method="get" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php" class="toolbar-grid">
+<section class="toolbar-card" data-page-skeleton>
+    <form method="get" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php" class="toolbar-grid" data-inline-validate>
         <input type="hidden" name="route" value="posts">
         <input type="hidden" name="view" value="<?= htmlspecialchars((string) ($view ?? 'active')) ?>">
         <div class="input-with-icon grow">
@@ -24,7 +24,7 @@ require dirname(__DIR__) . '/partials/page-header.php';
         </div>
     </form>
 </section>
-<section class="table-card">
+<section class="table-card" data-page-skeleton>
     <?php if ($canManagePosts): ?>
         <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=posts.bulk" class="bulk-toolbar" data-post-bulk-form>
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
@@ -54,9 +54,9 @@ require dirname(__DIR__) . '/partials/page-header.php';
             <?php foreach ($posts as $post): ?>
                 <tr data-row-link="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar.item&item_id=<?= (int) $post['id'] ?>">
                     <?php if ($canManagePosts): ?>
-                        <td class="check-col"><input type="checkbox" name="selected_ids[]" value="<?= (int) $post['id'] ?>" data-select-row></td>
+                        <td class="check-col" data-label="Select"><input type="checkbox" name="selected_ids[]" value="<?= (int) $post['id'] ?>" data-select-row></td>
                     <?php endif; ?>
-                    <td>
+                    <td data-label="Post">
                         <a class="post-link" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar.item&item_id=<?= (int) $post['id'] ?>">
                             <div class="post-cell">
                                 <div class="post-thumb post-thumb-image">
@@ -77,10 +77,10 @@ require dirname(__DIR__) . '/partials/page-header.php';
                             </div>
                         </a>
                     </td>
-                    <td><?= htmlspecialchars($post['company_name']) ?></td>
-                    <td><?= Ui::platformIcon($post['platform']) ?></td>
-                    <td><?= htmlspecialchars($post['scheduled_date']) ?></td>
-                    <td><span class="status-badge <?= Ui::statusClass($post['status']) ?>"><?= htmlspecialchars($post['status']) ?></span></td>
+                    <td data-label="Client"><?= htmlspecialchars($post['company_name']) ?></td>
+                    <td data-label="Platform"><?= Ui::platformIcon($post['platform']) ?></td>
+                    <td data-label="Date"><?= htmlspecialchars($post['scheduled_date']) ?></td>
+                    <td data-label="Status"><span class="status-badge <?= Ui::statusClass($post['status']) ?>"><?= htmlspecialchars($post['status']) ?></span></td>
                 </tr>
             <?php endforeach; ?>
         </tbody>

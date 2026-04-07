@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Core\Auth;
 use App\Core\Controller;
 use App\Core\Database;
+use App\Models\Calendar;
 use App\Models\CalendarItem;
 use App\Models\Client;
 use App\Models\User;
@@ -21,6 +22,33 @@ use Throwable;
 
 final class CalendarController extends Controller
 {
+    public function create(): void
+    {
+        Auth::requireRole(['master_admin', 'employee']);
+
+        $accessibleClients = Client::accessible();
+        $calendars = Calendar::list([
+            'client_id' => $_GET['client_id'] ?? '',
+            'month' => $_GET['month'] ?? '',
+            'year' => $_GET['year'] ?? '',
+        ]);
+
+        $this->view('calendar/create', [
+            'title' => 'New Post',
+            'clients' => $accessibleClients,
+            'calendars' => $calendars,
+            'employees' => User::employees(),
+            'statuses' => CalendarItem::STATUSES,
+            'platforms' => CalendarItem::PLATFORMS,
+            'defaults' => [
+                'client_id' => (string) ($_GET['client_id'] ?? ''),
+                'calendar_id' => (string) ($_GET['calendar_id'] ?? ''),
+                'scheduled_date' => (string) ($_GET['scheduled_date'] ?? ''),
+                'status' => 'Draft',
+            ],
+        ]);
+    }
+
     public function index(): void
     {
         Auth::requireRole(['master_admin', 'employee', 'client']);
@@ -93,6 +121,7 @@ final class CalendarController extends Controller
     {
         Auth::requireRole(['master_admin', 'employee']);
         $user = Auth::user();
+        $userId = (int) ($user['id'] ?? 0);
         $previousItem = null;
 
         $data = [
@@ -141,9 +170,28 @@ final class CalendarController extends Controller
                     assigned_employee_id = :assigned_employee_id,
                     status = :status
                  WHERE id = :id",
-                $data + ['id' => $itemId]
+                [
+                    'title' => $data['title'],
+                    'platform' => $data['platform'],
+                    'scheduled_date' => $data['scheduled_date'],
+                    'scheduled_time' => $data['scheduled_time'],
+                    'post_type' => $data['post_type'],
+                    'format' => $data['format'],
+                    'size' => $data['size'],
+                    'caption_en' => $data['caption_en'],
+                    'caption_ar' => $data['caption_ar'],
+                    'hashtags' => $data['hashtags'],
+                    'campaign' => $data['campaign'],
+                    'content_pillar' => $data['content_pillar'],
+                    'cta' => $data['cta'],
+                    'internal_notes' => $data['internal_notes'],
+                    'client_notes' => $data['client_notes'],
+                    'assigned_employee_id' => $data['assigned_employee_id'],
+                    'status' => $data['status'],
+                    'id' => $itemId,
+                ]
             );
-            $this->recordEditHistory($itemId, $user['id'], $previousItem, $data);
+            $this->recordEditHistory($itemId, $userId, $previousItem, $data);
         } else {
             $itemId = Database::insert(
                 "INSERT INTO calendar_items (
@@ -155,7 +203,7 @@ final class CalendarController extends Controller
                     :post_type, :format, :size, :caption_en, :caption_ar, :hashtags, :campaign, :content_pillar, :cta,
                     :internal_notes, :client_notes, :status
                 )",
-                $data + ['created_by' => $user['id']]
+                $data + ['created_by' => $userId]
             );
         }
 
@@ -166,7 +214,7 @@ final class CalendarController extends Controller
 
                 Database::insert(
                     'INSERT INTO item_files (calendar_item_id, version_number, original_name, stored_name, file_path, mime_type, file_size, uploaded_by) VALUES (:calendar_item_id, :version_number, :original_name, :stored_name, :file_path, :mime_type, :file_size, :uploaded_by)',
-                    $upload + ['calendar_item_id' => $itemId, 'version_number' => $version, 'uploaded_by' => $user['id']]
+                    $upload + ['calendar_item_id' => $itemId, 'version_number' => $version, 'uploaded_by' => $userId]
                 );
 
                 Database::query(
@@ -478,7 +526,7 @@ final class CalendarController extends Controller
             $itemId,
             'item_submitted',
             'New post submitted for approval',
-            "Post: {$item['title']}\nClient: {$item['company_name']}\nStatus: Pending Approval\nLink: index.php?route=calendar.item&item_id={$itemId}"
+            "A new post is ready for your review in the G2 Social Media Calendar.\n\nPost title: {$item['title']}\nClient: {$item['company_name']}\nPlatform: {$item['platform']}\nScheduled date: {$item['scheduled_date']}\nStatus: Pending Approval\n\nUse the button below to open the review page and approve it or request changes."
         );
     }
 

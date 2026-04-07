@@ -6,8 +6,8 @@ require dirname(__DIR__) . '/partials/header.php';
 $subtitle = count($campaigns) . ' campaign group' . (count($campaigns) === 1 ? '' : 's') . ' tracked across content, approvals, and analytics.';
 require dirname(__DIR__) . '/partials/page-header.php';
 ?>
-<section class="toolbar-card">
-    <form method="get" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php" class="toolbar-grid">
+<section class="toolbar-card" data-page-skeleton>
+    <form method="get" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php" class="toolbar-grid" data-inline-validate>
         <input type="hidden" name="route" value="campaigns">
         <label>
             <span>Client</span>
@@ -22,7 +22,7 @@ require dirname(__DIR__) . '/partials/page-header.php';
     </form>
 </section>
 
-<section class="entity-grid">
+<section class="entity-grid" data-page-skeleton>
     <?php foreach ($campaigns as $campaign): ?>
         <article class="entity-card">
             <div class="entity-card-head">

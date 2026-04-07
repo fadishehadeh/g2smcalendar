@@ -4,10 +4,10 @@ require dirname(__DIR__) . '/partials/header.php';
 $subtitle = 'Generate weekly/monthly reports, configure automatic dispatch, and review report history.';
 require dirname(__DIR__) . '/partials/page-header.php';
 ?>
-<section class="settings-grid">
+<section class="settings-grid" data-page-skeleton>
     <article class="card">
         <div class="card-head"><div><h3>Generate Report</h3><p>Create a report now and optionally email it.</p></div></div>
-        <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=reports.generate" class="stack">
+        <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=reports.generate" class="stack" data-inline-validate data-loading-form>
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
             <label>
                 <span>Report Type</span>
@@ -28,46 +28,49 @@ require dirname(__DIR__) . '/partials/page-header.php';
                         <?php endforeach; ?>
                     </select>
                 </label>
-                <label><span>Email Recipient</span><input type="email" name="recipient_email" placeholder="optional@client.com"></label>
+                <label><span>Email Recipient</span><input type="email" name="recipient_email" placeholder="optional@client.com" data-email-optional></label>
             </div>
-            <label><span><input type="checkbox" name="send_email" value="1" style="width:auto;min-height:auto;"> Email after generation</span></label>
-            <button class="btn btn-primary" type="submit">Generate Report</button>
+            <label><span><input type="checkbox" name="send_email" value="1" style="width:auto;min-height:auto;" data-requires-field="recipient_email"> Email after generation</span></label>
+            <button class="btn btn-primary" type="submit" data-loading-text="Generating report...">Generate & Download</button>
         </form>
     </article>
 
     <article class="card">
         <div class="card-head"><div><h3>Automation</h3><p>Configure recurring weekly and monthly report dispatch.</p></div></div>
-        <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=reports.settings" class="stack">
+        <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=reports.settings" class="stack" data-inline-validate data-loading-form>
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
-            <label><span><input type="checkbox" name="weekly_enabled" value="1" <?= $automation['weekly_enabled'] === '1' ? 'checked' : '' ?> style="width:auto;min-height:auto;"> Weekly reports enabled</span></label>
+            <label><span><input type="checkbox" name="weekly_enabled" value="1" <?= $automation['weekly_enabled'] === '1' ? 'checked' : '' ?> style="width:auto;min-height:auto;" data-requires-field="weekly_recipient"> Weekly reports enabled</span></label>
             <label><span>Weekly Recipient</span><input type="email" name="weekly_recipient" value="<?= htmlspecialchars((string) $automation['weekly_recipient']) ?>"></label>
-            <label><span><input type="checkbox" name="monthly_enabled" value="1" <?= $automation['monthly_enabled'] === '1' ? 'checked' : '' ?> style="width:auto;min-height:auto;"> Monthly reports enabled</span></label>
+            <label><span><input type="checkbox" name="monthly_enabled" value="1" <?= $automation['monthly_enabled'] === '1' ? 'checked' : '' ?> style="width:auto;min-height:auto;" data-requires-field="monthly_recipient"> Monthly reports enabled</span></label>
             <label><span>Monthly Recipient</span><input type="email" name="monthly_recipient" value="<?= htmlspecialchars((string) $automation['monthly_recipient']) ?>"></label>
             <div class="page-actions">
-                <button class="btn btn-secondary" type="submit">Save Automation</button>
+                <button class="btn btn-secondary" type="submit" data-loading-text="Saving automation...">Save Automation</button>
             </div>
         </form>
-        <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=reports.dispatch" class="page-actions" style="margin-top:16px;">
+        <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=reports.dispatch" class="page-actions" style="margin-top:16px;" data-loading-form>
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
-            <button class="btn btn-primary" type="submit">Dispatch Due Reports</button>
+            <button class="btn btn-primary" type="submit" data-loading-text="Dispatching reports...">Dispatch Due Reports</button>
         </form>
     </article>
 </section>
 
-<section class="table-card">
+<section class="table-card" data-page-skeleton>
     <table class="data-table">
         <thead>
-            <tr><th>Type</th><th>Period</th><th>Recipient</th><th>Status</th><th>Generated By</th><th>Created</th></tr>
+            <tr><th>Type</th><th>Period</th><th>Recipient</th><th>Status</th><th>Generated By</th><th>Created</th><th>Action</th></tr>
         </thead>
         <tbody>
             <?php foreach ($runs as $run): ?>
                 <tr>
-                    <td><?= htmlspecialchars(strtoupper((string) $run['report_type'])) ?></td>
-                    <td><?= htmlspecialchars((string) $run['period_start']) ?> to <?= htmlspecialchars((string) $run['period_end']) ?></td>
-                    <td><?= htmlspecialchars((string) ($run['recipient_email'] ?: '-')) ?></td>
-                    <td><span class="status-badge <?= \App\Core\Ui::statusClass((string) $run['status']) ?>"><?= htmlspecialchars((string) $run['status']) ?></span></td>
-                    <td><?= htmlspecialchars((string) ($run['generated_by_name'] ?: 'System')) ?></td>
-                    <td><?= htmlspecialchars((string) $run['created_at']) ?></td>
+                    <td data-label="Type"><?= htmlspecialchars(strtoupper((string) $run['report_type'])) ?></td>
+                    <td data-label="Period"><?= htmlspecialchars((string) $run['period_start']) ?> to <?= htmlspecialchars((string) $run['period_end']) ?></td>
+                    <td data-label="Recipient"><?= htmlspecialchars((string) ($run['recipient_email'] ?: '-')) ?></td>
+                    <td data-label="Status"><span class="status-badge <?= \App\Core\Ui::statusClass((string) $run['status']) ?>"><?= htmlspecialchars((string) $run['status']) ?></span></td>
+                    <td data-label="Generated By"><?= htmlspecialchars((string) ($run['generated_by_name'] ?: 'System')) ?></td>
+                    <td data-label="Created"><?= htmlspecialchars((string) $run['created_at']) ?></td>
+                    <td data-label="Action" class="table-actions">
+                        <a class="btn btn-secondary" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=reports.download&report_id=<?= (int) $run['id'] ?>">Download</a>
+                    </td>
                 </tr>
             <?php endforeach; ?>
         </tbody>

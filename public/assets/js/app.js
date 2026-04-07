@@ -23,12 +23,58 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const sidebar = document.querySelector('[data-sidebar]');
-    const sidebarToggle = document.querySelector('[data-sidebar-toggle]');
+    const sidebarToggles = [...document.querySelectorAll('[data-sidebar-toggle]')];
 
-    if (sidebar && sidebarToggle) {
-        sidebarToggle.addEventListener('click', () => {
-            sidebar.classList.toggle('is-open');
+    if (sidebar && sidebarToggles.length) {
+        const desktopQuery = window.matchMedia('(max-width: 980px)');
+        const syncSidebarToggleLabels = () => {
+            const isCollapsed = document.body.classList.contains('sidebar-collapsed');
+            const isMobileOpen = sidebar.classList.contains('is-open');
+
+            sidebarToggles.forEach((toggle) => {
+                toggle.setAttribute(
+                    'aria-label',
+                    desktopQuery.matches
+                        ? (isMobileOpen ? 'Hide sidebar' : 'Show sidebar')
+                        : (isCollapsed ? 'Show sidebar' : 'Hide sidebar')
+                );
+            });
+        };
+
+        try {
+            if (window.localStorage.getItem('g2.sidebar.collapsed') === '1' && !desktopQuery.matches) {
+                document.body.classList.add('sidebar-collapsed');
+            }
+        } catch (error) {
+            // Ignore storage access issues.
+        }
+
+        sidebarToggles.forEach((toggle) => {
+            toggle.addEventListener('click', () => {
+                if (desktopQuery.matches) {
+                    sidebar.classList.toggle('is-open');
+                } else {
+                    document.body.classList.toggle('sidebar-collapsed');
+                    try {
+                        window.localStorage.setItem(
+                            'g2.sidebar.collapsed',
+                            document.body.classList.contains('sidebar-collapsed') ? '1' : '0'
+                        );
+                    } catch (error) {
+                        // Ignore storage access issues.
+                    }
+                }
+
+                syncSidebarToggleLabels();
+            });
         });
+
+        desktopQuery.addEventListener('change', () => {
+            sidebar.classList.remove('is-open');
+            syncSidebarToggleLabels();
+        });
+
+        syncSidebarToggleLabels();
     }
 
     const demoCards = document.querySelectorAll('[data-demo-email]');
@@ -89,11 +135,21 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.classList.add('modal-open');
         };
 
-        document.querySelectorAll('[data-item-id]').forEach((button) => {
-            button.addEventListener('click', () => {
-                const itemId = button.getAttribute('data-item-id') || '';
-                const source = button.getAttribute('data-item-source') || 'calendar';
-                const item = itemStores[source]?.[itemId] || {};
+        document.querySelectorAll('[data-item-id]').forEach((trigger) => {
+            trigger.addEventListener('click', (event) => {
+                const itemId = trigger.getAttribute('data-item-id') || '';
+                const source = trigger.getAttribute('data-item-source') || 'calendar';
+                const item = itemStores[source]?.[itemId] || null;
+
+                if (!item || !item.id) {
+                    const fallbackHref = trigger.getAttribute('href');
+                    if (fallbackHref) {
+                        window.location.href = fallbackHref;
+                    }
+                    return;
+                }
+
+                event.preventDefault();
                 openItemModal(item);
             });
         });
@@ -168,6 +224,121 @@ document.addEventListener('DOMContentLoaded', () => {
 
         syncBulkState();
     }
+
+    const validationForms = document.querySelectorAll('[data-inline-validate]');
+    const ensureFeedbackNode = (field) => {
+        const container = field.closest('label') || field.parentElement;
+        if (!container) {
+            return null;
+        }
+
+        let feedback = container.querySelector('[data-field-feedback]');
+        if (!feedback) {
+            feedback = document.createElement('small');
+            feedback.className = 'field-feedback';
+            feedback.setAttribute('data-field-feedback', '');
+            container.appendChild(feedback);
+        }
+
+        return feedback;
+    };
+
+    const syncFieldState = (field, force = false) => {
+        if (!field || field.disabled || field.type === 'hidden' || field.type === 'checkbox' || field.type === 'radio') {
+            return true;
+        }
+
+        const feedback = ensureFeedbackNode(field);
+        const value = String(field.value || '').trim();
+        const shouldValidate = force || value !== '' || field.required;
+        const isOptionalEmpty = !field.required && value === '';
+        const isValid = isOptionalEmpty || !shouldValidate || field.checkValidity();
+
+        field.classList.toggle('is-valid', shouldValidate && !isOptionalEmpty && isValid);
+        field.classList.toggle('is-invalid', shouldValidate && !isValid);
+
+        if (feedback) {
+            if (shouldValidate && !isValid) {
+                feedback.textContent = field.validationMessage || 'Check this field.';
+                feedback.classList.add('is-visible', 'is-invalid');
+                feedback.classList.remove('is-valid');
+            } else if (!isOptionalEmpty && shouldValidate && isValid) {
+                feedback.textContent = 'Looks good.';
+                feedback.classList.add('is-visible', 'is-valid');
+                feedback.classList.remove('is-invalid');
+            } else {
+                feedback.textContent = '';
+                feedback.classList.remove('is-visible', 'is-invalid', 'is-valid');
+            }
+        }
+
+        return isValid;
+    };
+
+    validationForms.forEach((form) => {
+        const fields = [...form.querySelectorAll('input, select, textarea')];
+        form.querySelectorAll('[data-requires-field]').forEach((toggle) => {
+            const targetName = toggle.getAttribute('data-requires-field');
+            const targetField = targetName ? form.querySelector(`[name="${targetName}"]`) : null;
+            if (!targetField) {
+                return;
+            }
+
+            const syncDependency = () => {
+                targetField.required = !!toggle.checked;
+                syncFieldState(targetField, !!toggle.checked && document.activeElement !== targetField);
+            };
+
+            toggle.addEventListener('change', syncDependency);
+            syncDependency();
+        });
+
+        fields.forEach((field) => {
+            field.addEventListener('input', () => syncFieldState(field));
+            field.addEventListener('change', () => syncFieldState(field, field.tagName === 'SELECT'));
+            field.addEventListener('blur', () => syncFieldState(field, true));
+        });
+
+        form.addEventListener('submit', (event) => {
+            const invalidField = fields.find((field) => !syncFieldState(field, true));
+            if (invalidField) {
+                event.preventDefault();
+                invalidField.focus();
+            }
+        });
+    });
+
+    document.querySelectorAll('form[data-loading-form]').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+            const exactName = form.getAttribute('data-confirm-exact-name');
+            if (exactName) {
+                const entity = form.getAttribute('data-confirm-entity') || 'record';
+                const typed = window.prompt(`Type the ${entity} name exactly to confirm deletion:\n${exactName}`, '');
+                if (typed !== exactName) {
+                    event.preventDefault();
+                    return;
+                }
+            }
+
+            const submitter = event.submitter;
+            if (!submitter || submitter.disabled) {
+                return;
+            }
+
+            if (!form.checkValidity()) {
+                return;
+            }
+
+            const label = submitter.getAttribute('data-loading-text');
+            if (label) {
+                submitter.dataset.originalText = submitter.textContent || '';
+                submitter.textContent = label;
+            }
+
+            submitter.disabled = true;
+            form.classList.add('is-submitting');
+        });
+    });
 
     const clientReviewForm = document.querySelector('[data-client-review-form], [data-client-guided-review]');
     const clientReviewComment = document.querySelector('[data-client-review-comment]');

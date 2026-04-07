@@ -3,6 +3,7 @@
 require dirname(__DIR__) . '/partials/header.php';
 
 $draft = $draft ?? [];
+$turnaroundOptions = ['12 hours', '24 hours', '48 hours', '72 hours', '96 hours', '120 hours'];
 $subtitle = 'Add a client in a guided flow with account ownership, workflow expectations, and optional portal access.';
 $pageActions = [
     ['label' => 'Back to Clients', 'href' => $config['app']['base_url'] . '/index.php?route=clients', 'class' => 'btn-secondary', 'icon' => 'left'],
@@ -45,6 +46,20 @@ require dirname(__DIR__) . '/partials/wizard-stepper.php';
                 <label class="selection-chip"><input type="checkbox" name="create_portal_access" value="1" <?= !empty($draft['create_portal_access']) ? 'checked' : '' ?>><span>Create portal access for this contact</span></label>
                 <label class="selection-chip"><input type="checkbox" name="send_welcome_email" value="1" <?= !empty($draft['send_welcome_email']) ? 'checked' : '' ?>><span>Send welcome email after create</span></label>
             </div>
+            <div class="form-grid">
+                <label>
+                    <span>Password Setup</span>
+                    <select name="password_mode">
+                        <option value="auto" <?= (($draft['password_mode'] ?? 'auto') === 'auto') ? 'selected' : '' ?>>Generate automatically</option>
+                        <option value="manual" <?= (($draft['password_mode'] ?? '') === 'manual') ? 'selected' : '' ?>>Set manually</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Manual Password</span>
+                    <input type="text" name="client_password" value="<?= htmlspecialchars((string) ($draft['client_password'] ?? '')) ?>" placeholder="Used only when password mode is manual">
+                </label>
+            </div>
+            <div class="helper-block">If portal access is enabled and no existing client login is linked, the system will create the client account using either an auto-generated password or the manual password you enter.</div>
         </section>
 
         <section class="wizard-panel" data-step-panel="2">
@@ -54,22 +69,13 @@ require dirname(__DIR__) . '/partials/wizard-stepper.php';
                     <p>Choose who handles this client day to day. The account owner is the main responsible person.</p>
                 </div>
             </div>
-            <div class="wizard-choice-grid compact">
-                <?php foreach ($employees as $employee): ?>
-                    <label class="wizard-choice-card">
-                        <input type="checkbox" name="employee_ids[]" value="<?= (int) $employee['id'] ?>" <?= in_array((string) $employee['id'], array_map('strval', (array) ($draft['employee_ids'] ?? [])), true) ? 'checked' : '' ?>>
-                        <strong><?= htmlspecialchars($employee['name']) ?></strong>
-                        <span><?= htmlspecialchars($employee['email']) ?></span>
-                    </label>
-                <?php endforeach; ?>
-            </div>
             <div class="form-grid">
                 <label>
                     <span>Account Owner</span>
                     <select name="account_owner_employee_id">
                         <option value="">Choose responsible employee</option>
                         <?php foreach ($employees as $employee): ?>
-                            <option value="<?= (int) $employee['id'] ?>" <?= (string) ($draft['account_owner_employee_id'] ?? '') === (string) $employee['id'] ? 'selected' : '' ?>><?= htmlspecialchars($employee['name']) ?></option>
+                            <option value="<?= (int) $employee['id'] ?>" <?= (string) ($draft['account_owner_employee_id'] ?? '') === (string) $employee['id'] ? 'selected' : '' ?>><?= htmlspecialchars($employee['name'] . ' - ' . $employee['email']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </label>
@@ -80,7 +86,16 @@ require dirname(__DIR__) . '/partials/wizard-stepper.php';
                         <option value="inactive" <?= (($draft['status'] ?? '') === 'inactive') ? 'selected' : '' ?>>Inactive</option>
                     </select>
                 </label>
+                <label class="field-span-2">
+                    <span>Assigned Employees</span>
+                    <select name="employee_ids[]" multiple size="8">
+                        <?php foreach ($employees as $employee): ?>
+                            <option value="<?= (int) $employee['id'] ?>" <?= in_array((string) $employee['id'], array_map('strval', (array) ($draft['employee_ids'] ?? [])), true) ? 'selected' : '' ?>><?= htmlspecialchars($employee['name'] . ' - ' . $employee['email']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
             </div>
+            <div class="helper-block">Pick one account owner from the dropdown, then use the multi-select list to assign additional employees to this client.</div>
         </section>
 
         <section class="wizard-panel" data-step-panel="3">
@@ -92,7 +107,14 @@ require dirname(__DIR__) . '/partials/wizard-stepper.php';
             </div>
             <div class="form-grid">
                 <label><span>Default Workflow Preferences</span><input type="text" name="workflow_preferences" value="<?= htmlspecialchars((string) ($draft['workflow_preferences'] ?? 'Standard review + revision cycle')) ?>" placeholder="Standard review + revision cycle"></label>
-                <label><span>Approval Turnaround Expectation</span><input type="text" name="approval_turnaround" value="<?= htmlspecialchars((string) ($draft['approval_turnaround'] ?? '48 hours')) ?>" placeholder="48 hours"></label>
+                <label>
+                    <span>Approval Turnaround Expectation</span>
+                    <select name="approval_turnaround">
+                        <?php foreach ($turnaroundOptions as $option): ?>
+                            <option value="<?= htmlspecialchars($option) ?>" <?= (($draft['approval_turnaround'] ?? '48 hours') === $option) ? 'selected' : '' ?>><?= htmlspecialchars($option) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
             </div>
             <label><span>Brand Notes</span><textarea name="brand_notes" placeholder="Tone, visual considerations, or reminders"><?= htmlspecialchars((string) ($draft['brand_notes'] ?? '')) ?></textarea></label>
             <label><span>Naming Conventions</span><textarea name="naming_conventions" placeholder="How this client likes calendars, campaigns, or files named"><?= htmlspecialchars((string) ($draft['naming_conventions'] ?? '')) ?></textarea></label>

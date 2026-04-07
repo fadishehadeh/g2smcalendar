@@ -64,6 +64,8 @@ final class ReportService
         ]);
 
         $subject = strtoupper($type) . ' Report · ' . $period['label'];
+        $subject = str_replace('Â·', '-', $subject);
+        $subject = sprintf('%s Report - %s', strtoupper($type), $period['label']);
         $body = $this->buildBody($subject, $overview, $posts);
         $recipient = trim((string) ($filters['recipient_email'] ?? ''));
 
@@ -108,6 +110,110 @@ final class ReportService
         }
 
         return $generated;
+    }
+
+    public function streamDownload(int $reportId): never
+    {
+        $run = Database::fetch(
+            'SELECT rr.* FROM report_runs rr WHERE rr.id = :id LIMIT 1',
+            ['id' => $reportId]
+        );
+
+        if (!$run) {
+            http_response_code(404);
+            exit('Report not found');
+        }
+
+        $period = trim((string) (($run['period_start'] ?? '') . '-' . ($run['period_end'] ?? '')), '-');
+        $filename = sprintf(
+            '%s-report-%s.txt',
+            preg_replace('/[^a-z0-9]+/i', '-', strtolower((string) ($run['report_type'] ?? 'report'))) ?: 'report',
+            preg_replace('/[^0-9\-]+/', '-', $period) ?: date('Y-m-d')
+        );
+
+        $subject = (string) ($run['report_subject'] ?? 'Report');
+        $body = (string) ($run['report_body'] ?? '');
+        $pdf = $this->buildPdfDocument($subject, $body);
+
+        header('Content-Type: application/pdf');
+        header('Content-Length: ' . strlen($pdf));
+        header('Content-Disposition: attachment; filename="' . trim(str_replace('.txt', '.pdf', $filename), '-') . '"');
+        header('X-Content-Type-Options: nosniff');
+        echo $pdf;
+        exit;
+    }
+
+    private function buildPdfDocument(string $title, string $body): string
+    {
+        $lines = array_merge([$title, ''], preg_split('/\R/u', $body) ?: []);
+        $wrapped = [];
+
+        foreach ($lines as $line) {
+            $line = $this->pdfAscii($line);
+            $chunks = explode("\n", wordwrap($line, 92, "\n", true));
+            foreach ($chunks as $chunk) {
+                $wrapped[] = $chunk;
+            }
+        }
+
+        $contentLines = [
+            'BT',
+            '/F1 12 Tf',
+            '50 792 Td',
+            '15 TL',
+        ];
+
+        foreach ($wrapped as $line) {
+            $contentLines[] = '(' . $this->pdfEscape($line) . ') Tj';
+            $contentLines[] = 'T*';
+        }
+
+        $contentLines[] = 'ET';
+        $stream = implode("\n", $contentLines);
+
+        $objects = [];
+        $objects[] = '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj';
+        $objects[] = '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj';
+        $objects[] = '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj';
+        $objects[] = '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj';
+        $objects[] = '5 0 obj << /Length ' . strlen($stream) . " >> stream\n" . $stream . "\nendstream endobj";
+
+        $pdf = "%PDF-1.4\n";
+        $offsets = [0];
+
+        foreach ($objects as $object) {
+            $offsets[] = strlen($pdf);
+            $pdf .= $object . "\n";
+        }
+
+        $xrefOffset = strlen($pdf);
+        $pdf .= 'xref' . "\n";
+        $pdf .= '0 ' . (count($objects) + 1) . "\n";
+        $pdf .= "0000000000 65535 f \n";
+
+        for ($i = 1; $i <= count($objects); $i++) {
+            $pdf .= sprintf('%010d 00000 n ', $offsets[$i]) . "\n";
+        }
+
+        $pdf .= 'trailer << /Size ' . (count($objects) + 1) . " /Root 1 0 R >>\n";
+        $pdf .= 'startxref' . "\n" . $xrefOffset . "\n%%EOF";
+
+        return $pdf;
+    }
+
+    private function pdfEscape(string $value): string
+    {
+        return str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $value);
+    }
+
+    private function pdfAscii(string $value): string
+    {
+        $normalized = function_exists('iconv')
+            ? (string) iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value)
+            : $value;
+
+        $normalized = str_replace(["\r", "\t"], [' ', ' '], $normalized);
+        return preg_replace('/[^ -~]/', '', $normalized) ?? '';
     }
 
     private function period(string $type, array $filters): array

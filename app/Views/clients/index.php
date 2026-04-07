@@ -3,6 +3,8 @@
 use App\Core\Ui;
 
 require dirname(__DIR__) . '/partials/header.php';
+$canCreateClient = in_array($authUser['role_name'] ?? '', ['master_admin', 'employee'], true);
+$canDeleteClient = in_array($authUser['role_name'] ?? '', ['master_admin', 'employee'], true);
 $pageActions = [
     ['label' => 'Client Wizard', 'href' => $config['app']['base_url'] . '/index.php?route=wizard.client', 'class' => 'btn-primary', 'icon' => 'plus'],
 ];
@@ -50,20 +52,27 @@ require dirname(__DIR__) . '/partials/page-header.php';
                     <div><dt>Employees</dt><dd><?= (int) $client['employees_count'] ?></dd></div>
                 </dl>
                 <div class="entity-actions">
-                    <a class="btn btn-secondary" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar&client_id=<?= (int) $client['id'] ?>">View</a>
+                    <a class="btn btn-secondary" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=clients.show&client_id=<?= (int) $client['id'] ?>">View</a>
                     <a class="btn btn-secondary" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=wizard.client">Add Another</a>
+                    <?php if ($canDeleteClient): ?>
+                        <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=clients.delete" data-loading-form data-confirm-exact-name="<?= htmlspecialchars($client['company_name']) ?>" data-confirm-entity="client">
+                            <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
+                            <input type="hidden" name="client_id" value="<?= (int) $client['id'] ?>">
+                            <button class="btn btn-danger-soft" type="submit" data-loading-text="Deleting client...">Delete Client</button>
+                        </form>
+                    <?php endif; ?>
                 </div>
             </article>
         <?php endforeach; ?>
     </section>
 <?php endif; ?>
 
-<?php if (($authUser['role_name'] ?? '') === 'master_admin'): ?>
+<?php if ($canCreateClient): ?>
 <section class="card form-card" id="client-form">
     <div class="card-head">
         <div>
             <h3>Add Client</h3>
-            <p>Quick create is still available. For non-technical users, the guided Client Wizard is recommended.</p>
+            <p>Quick create is available here. The guided Client Wizard is still the better path for a full setup flow.</p>
         </div>
     </div>
     <div class="helper-block">Recommended path: use the Client Wizard to create the client, assign the account owner, and save workflow preferences in one flow.</div>
@@ -83,10 +92,37 @@ require dirname(__DIR__) . '/partials/page-header.php';
             </select>
         </label>
         <label>
-            <span>Assigned Employees</span>
-            <select name="employee_ids[]" multiple size="5">
+            <span>Create Portal Access</span>
+            <select name="create_portal_access">
+                <option value="0">No</option>
+                <option value="1">Yes</option>
+            </select>
+        </label>
+        <label>
+            <span>Password Setup</span>
+            <select name="password_mode">
+                <option value="auto">Generate automatically</option>
+                <option value="manual">Set manually</option>
+            </select>
+        </label>
+        <label>
+            <span>Manual Password</span>
+            <input type="text" name="client_password" placeholder="Used only when password mode is manual">
+        </label>
+        <label>
+            <span>Account Owner</span>
+            <select name="account_owner_employee_id">
+                <option value="">Choose responsible employee</option>
                 <?php foreach ($employees as $employee): ?>
-                    <option value="<?= (int) $employee['id'] ?>"><?= htmlspecialchars($employee['name']) ?></option>
+                    <option value="<?= (int) $employee['id'] ?>"><?= htmlspecialchars($employee['name'] . ' - ' . $employee['email']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <label>
+            <span>Assigned Employees</span>
+            <select name="employee_ids[]" multiple size="6">
+                <?php foreach ($employees as $employee): ?>
+                    <option value="<?= (int) $employee['id'] ?>"><?= htmlspecialchars($employee['name'] . ' - ' . $employee['email']) ?></option>
                 <?php endforeach; ?>
             </select>
         </label>
@@ -97,6 +133,7 @@ require dirname(__DIR__) . '/partials/page-header.php';
                 <option value="inactive">Inactive</option>
             </select>
         </label>
+        <div class="helper-block">Choose one account owner, use the multi-select list to add all employees who should handle this client, and optionally create the client login with an automatic or manual password.</div>
         <div class="form-actions">
             <button class="btn btn-primary" type="submit">Create Client</button>
         </div>

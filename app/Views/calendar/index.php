@@ -12,6 +12,7 @@ $rangeTitle = $viewMode === 'weekly'
 $title = 'Content Calendar';
 $subtitle = $rangeTitle . ' - ' . $monthData['total_posts'] . ' posts';
 $pageActions = [
+    ['label' => 'New Post', 'href' => $config['app']['base_url'] . '/index.php?route=calendar.create&client_id=' . urlencode((string) ($filters['client_id'] ?? '')), 'class' => 'btn-secondary', 'icon' => 'plus'],
     ['label' => 'Calendar Wizard', 'href' => $config['app']['base_url'] . '/index.php?route=wizard.calendar', 'class' => 'btn-secondary', 'icon' => 'plus'],
     ['label' => 'Bulk Wizard', 'href' => $config['app']['base_url'] . '/index.php?route=wizard', 'class' => 'btn-primary', 'icon' => 'calendar'],
 ];
@@ -154,8 +155,9 @@ $calendarBaseQuery = [
         <?php if ($items === []): ?>
             <?php
             $emptyTitle = 'No posts are scheduled in this range';
-            $emptyMessage = 'Create the calendar first, then use the Bulk Wizard to generate posts with smart defaults and repeating patterns.';
+            $emptyMessage = 'Create a single post with New Post, or use the Bulk Wizard to generate many posts at once.';
             $emptyActions = [
+                ['label' => 'New Post', 'href' => $config['app']['base_url'] . '/index.php?route=calendar.create&client_id=' . urlencode((string) ($filters['client_id'] ?? '')), 'class' => 'btn-secondary'],
                 ['label' => 'Open Calendar Wizard', 'href' => $config['app']['base_url'] . '/index.php?route=wizard.calendar', 'class' => 'btn-secondary'],
                 ['label' => 'Open Bulk Wizard', 'href' => $config['app']['base_url'] . '/index.php?route=wizard', 'class' => 'btn-primary'],
             ];
@@ -178,11 +180,11 @@ $calendarBaseQuery = [
                         </div>
                         <div class="calendar-cell-items">
                             <?php foreach (array_slice($dayItems, 0, 4) as $dayItem): ?>
-                                <button class="calendar-event-row calendar-event-button <?= in_array((string) $dayItem['status'], $attentionStatuses, true) ? 'needs-attention' : '' ?>" type="button" data-item-id="<?= (int) $dayItem['id'] ?>" data-item-source="calendar">
+                                <a class="calendar-event-row calendar-event-button <?= in_array((string) $dayItem['status'], $attentionStatuses, true) ? 'needs-attention' : '' ?>" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar.item&item_id=<?= (int) $dayItem['id'] ?>">
                                     <?= Ui::platformIcon($dayItem['platform']) ?>
                                     <span class="event-client"><?= htmlspecialchars($dayItem['company_name']) ?></span>
                                     <span class="event-dot <?= Ui::statusClass($dayItem['status']) ?>"></span>
-                                </button>
+                                </a>
                             <?php endforeach; ?>
                             <?php if (count($dayItems) > 4): ?>
                                 <span class="more-link">+<?= count($dayItems) - 4 ?> more</span>
@@ -206,11 +208,11 @@ $calendarBaseQuery = [
                                 <p class="muted">No scheduled posts.</p>
                             <?php endif; ?>
                             <?php foreach ($dayItems as $dayItem): ?>
-                                <button class="calendar-event-row calendar-event-button <?= in_array((string) $dayItem['status'], $attentionStatuses, true) ? 'needs-attention' : '' ?>" type="button" data-item-id="<?= (int) $dayItem['id'] ?>" data-item-source="calendar">
+                                <a class="calendar-event-row calendar-event-button <?= in_array((string) $dayItem['status'], $attentionStatuses, true) ? 'needs-attention' : '' ?>" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar.item&item_id=<?= (int) $dayItem['id'] ?>">
                                     <?= Ui::platformIcon($dayItem['platform']) ?>
                                     <span class="event-client"><?= htmlspecialchars($dayItem['title']) ?></span>
                                     <span class="event-dot <?= Ui::statusClass($dayItem['status']) ?>"></span>
-                                </button>
+                                </a>
                                 <small class="week-day-client"><?= htmlspecialchars($dayItem['company_name']) ?></small>
                             <?php endforeach; ?>
                         </div>

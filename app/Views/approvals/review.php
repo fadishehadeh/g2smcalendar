@@ -5,6 +5,7 @@ use App\Core\Ui;
 require dirname(__DIR__) . '/partials/header.php';
 
 $latestFile = $files[0] ?? null;
+$latestPreviewKind = Ui::mediaKind($latestFile['mime_type'] ?? '');
 $subtitle = 'Review the content exactly once, then approve it or request changes in plain language.';
 $pageActions = [
     ['label' => 'Back to Approvals', 'href' => $config['app']['base_url'] . '/index.php?route=approvals', 'class' => 'btn-secondary', 'icon' => 'left'],
@@ -30,13 +31,13 @@ require dirname(__DIR__) . '/partials/wizard-stepper.php';
             </div>
             <div class="client-review-preview">
                 <?php if ($latestFile): ?>
-                    <div class="approval-preview approval-preview-image">
-                        <?php if (Ui::mediaKind($latestFile['mime_type'] ?? '') === 'video'): ?>
+                    <button class="approval-preview approval-preview-image artwork-frame-trigger" type="button" data-artwork-modal-open aria-label="Open artwork preview">
+                        <?php if ($latestPreviewKind === 'video'): ?>
                             <video src="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=preview.file&file_id=<?= (int) $latestFile['id'] ?>" controls playsinline preload="metadata"></video>
                         <?php else: ?>
                             <img src="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=preview.file&file_id=<?= (int) $latestFile['id'] ?>" alt="<?= htmlspecialchars($item['title']) ?>">
                         <?php endif; ?>
-                    </div>
+                    </button>
                 <?php endif; ?>
                 <div class="summary-grid">
                     <div><span>Title</span><strong><?= htmlspecialchars($item['title']) ?></strong></div>
@@ -92,5 +93,36 @@ require dirname(__DIR__) . '/partials/wizard-stepper.php';
         </div>
     </form>
 </section>
+
+<?php if ($latestFile): ?>
+    <div class="modal-backdrop" data-artwork-modal hidden>
+        <div class="item-modal artwork-modal">
+            <button class="icon-btn modal-close" type="button" data-close-artwork-modal aria-label="Close">
+                <?= Ui::icon('close') ?>
+            </button>
+            <div class="item-modal-preview">
+                <?php if ($latestPreviewKind === 'video'): ?>
+                    <video src="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=preview.file&file_id=<?= (int) $latestFile['id'] ?>" controls playsinline preload="metadata"></video>
+                <?php else: ?>
+                    <img src="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=preview.file&file_id=<?= (int) $latestFile['id'] ?>" alt="<?= htmlspecialchars($item['title']) ?>">
+                <?php endif; ?>
+            </div>
+            <div class="item-modal-body">
+                <div class="item-modal-top">
+                    <div>
+                        <h3><?= htmlspecialchars($item['title']) ?></h3>
+                        <p><?= htmlspecialchars($item['company_name']) ?> - <?= htmlspecialchars($item['scheduled_date']) ?></p>
+                    </div>
+                    <span class="status-badge <?= Ui::statusClass($item['status']) ?>"><?= htmlspecialchars($item['status']) ?></span>
+                </div>
+                <div class="detail-stats compact-stats">
+                    <div><span>Platform</span><strong><?= htmlspecialchars($item['platform']) ?></strong></div>
+                    <div><span>Post Type</span><strong><?= htmlspecialchars($item['post_type']) ?></strong></div>
+                    <div><span>Client</span><strong><?= htmlspecialchars($item['company_name']) ?></strong></div>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
 
 <?php require dirname(__DIR__) . '/partials/footer.php'; ?>

@@ -56,6 +56,11 @@ require dirname(__DIR__) . '/partials/page-header.php';
                 <div class="entity-actions">
                     <a class="btn btn-secondary" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=assignments">Assignments</a>
                     <a class="btn btn-secondary" href="#employee-form">Quick Add</a>
+                    <form method="post" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=employees.delete" data-loading-form data-confirm-exact-name="<?= htmlspecialchars($employee['name']) ?>" data-confirm-entity="employee">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
+                        <input type="hidden" name="employee_id" value="<?= (int) $employee['id'] ?>">
+                        <button class="btn btn-danger-soft" type="submit" data-loading-text="Deleting employee...">Delete Employee</button>
+                    </form>
                 </div>
             </article>
         <?php endforeach; ?>

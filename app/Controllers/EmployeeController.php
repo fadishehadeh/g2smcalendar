@@ -46,6 +46,57 @@ final class EmployeeController extends Controller
         $this->redirect('employees');
     }
 
+    public function delete(): void
+    {
+        Auth::requireRole(['master_admin']);
+
+        $employeeId = (int) ($_POST['employee_id'] ?? 0);
+        $employee = $employeeId > 0
+            ? Database::fetch(
+                "SELECT u.id, u.name, r.name AS role_name
+                 FROM users u
+                 JOIN roles r ON r.id = u.role_id
+                 WHERE u.id = :id
+                 LIMIT 1",
+                ['id' => $employeeId]
+            )
+            : null;
+
+        if (!$employee || ($employee['role_name'] ?? '') !== 'employee') {
+            $this->flash('error', 'Employee not found.');
+            $this->redirect('employees');
+        }
+
+        if ((int) (Auth::user()['id'] ?? 0) === $employeeId) {
+            $this->flash('error', 'You cannot delete your own logged-in account from here.');
+            $this->redirect('employees');
+        }
+
+        $dependencies = Database::fetch(
+            "SELECT
+                (SELECT COUNT(*) FROM clients WHERE account_owner_employee_id = :id) AS owned_clients,
+                (SELECT COUNT(*) FROM calendars WHERE assigned_employee_id = :id OR created_by = :id) AS calendars_count,
+                (SELECT COUNT(*) FROM calendar_items WHERE assigned_employee_id = :id OR created_by = :id) AS items_count,
+                (SELECT COUNT(*) FROM item_files WHERE uploaded_by = :id) AS files_count,
+                (SELECT COUNT(*) FROM item_comments WHERE user_id = :id) AS comments_count,
+                (SELECT COUNT(*) FROM item_status_history WHERE changed_by = :id) AS status_history_count,
+                (SELECT COUNT(*) FROM item_edit_history WHERE changed_by = :id) AS edit_history_count",
+            ['id' => $employeeId]
+        ) ?: [];
+
+        if (array_sum(array_map('intval', $dependencies)) > 0) {
+            $this->flash('error', 'Reassign or clear this employee\'s clients and content records before deletion.');
+            $this->redirect('employees');
+        }
+
+        Database::query('DELETE FROM employee_client_assignments WHERE employee_user_id = :id', ['id' => $employeeId]);
+        Database::query('DELETE FROM users WHERE id = :id', ['id' => $employeeId]);
+
+        ActivityLogger::log('employee_deleted', 'user', $employeeId, ['name' => $employee['name']]);
+        $this->flash('success', 'Employee deleted successfully.');
+        $this->redirect('employees');
+    }
+
     public function assignments(): void
     {
         Auth::requireRole(['master_admin']);

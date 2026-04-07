@@ -6,6 +6,7 @@ require dirname(__DIR__) . '/partials/header.php';
 $roleName = $authUser['role_name'] ?? '';
 $isClient = $roleName === 'client';
 $isAdmin = $roleName === 'master_admin';
+$canCreateClient = in_array($roleName, ['master_admin', 'employee'], true);
 
 $pageActions = [
     ['label' => 'View Calendar', 'href' => $config['app']['base_url'] . '/index.php?route=calendar', 'class' => 'btn-secondary', 'icon' => 'calendar'],
@@ -74,7 +75,7 @@ foreach ($pendingItems as $item) {
 
 <?php if (!$isClient): ?>
 <section class="dashboard-quick-actions" style="margin-bottom:20px;">
-    <?php if ($isAdmin): ?>
+    <?php if ($canCreateClient): ?>
     <a class="quick-action-card" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=wizard.client">
         <strong>Add Client</strong>
         <p>Guided setup for contacts, ownership, and workflow preferences.</p>
@@ -96,12 +97,6 @@ foreach ($pendingItems as $item) {
         <strong>Generate Report</strong>
         <p>Create a report from analytics, approvals, downloads, and activity.</p>
     </a>
-    <?php if ($isAdmin): ?>
-    <a class="quick-action-card" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=integrations">
-        <strong>Integration Setup</strong>
-        <p>Configure AI and analytics providers with guided setup screens.</p>
-    </a>
-    <?php endif; ?>
 </section>
 <?php endif; ?>
 
@@ -126,7 +121,11 @@ foreach ($pendingItems as $item) {
                 ?>
             <?php else: ?>
                 <?php foreach ($pendingItems as $item): ?>
-                    <button class="action-card" type="button" data-item-id="<?= (int) $item['id'] ?>" data-item-source="quick">
+                    <?php if ($isClient): ?>
+                        <a class="action-card" href="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar.item&item_id=<?= (int) $item['id'] ?>">
+                    <?php else: ?>
+                        <button class="action-card" type="button" data-item-id="<?= (int) $item['id'] ?>" data-item-source="quick">
+                    <?php endif; ?>
                         <div class="action-card-media">
                             <?php if (!empty($item['preview_file_id'])): ?>
                                 <?php if (Ui::mediaKind($item['preview_mime_type'] ?? '') === 'video'): ?>
@@ -144,7 +143,11 @@ foreach ($pendingItems as $item) {
                             <p><?= htmlspecialchars($item['company_name']) ?> - <?= htmlspecialchars($item['scheduled_date']) ?> - <?= htmlspecialchars($item['platform']) ?></p>
                             <span class="text-link"><?= htmlspecialchars($item['action_label']) ?></span>
                         </div>
-                    </button>
+                    <?php if ($isClient): ?>
+                        </a>
+                    <?php else: ?>
+                        </button>
+                    <?php endif; ?>
                 <?php endforeach; ?>
             <?php endif; ?>
         </div>

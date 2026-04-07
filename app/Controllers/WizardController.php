@@ -11,8 +11,8 @@ use App\Models\CalendarItem;
 use App\Models\Client;
 use App\Models\User;
 use App\Services\ActivityLogger;
+use App\Services\ClientWelcomeMailer;
 use App\Services\DemoAssetService;
-use App\Services\MailTransport;
 use App\Services\NotificationService;
 use App\Services\UploadService;
 use App\Services\WizardDraftService;
@@ -141,7 +141,7 @@ final class WizardController extends Controller
 
     public function clientOnboarding(): void
     {
-        Auth::requireRole(['master_admin']);
+        Auth::requireRole(['master_admin', 'employee']);
         $user = Auth::user();
 
         $this->view('wizard/client_onboarding', [
@@ -154,7 +154,7 @@ final class WizardController extends Controller
 
     public function clientStore(): void
     {
-        Auth::requireRole(['master_admin']);
+        Auth::requireRole(['master_admin', 'employee']);
         $user = Auth::user();
         $drafts = new WizardDraftService();
 
@@ -176,8 +176,22 @@ final class WizardController extends Controller
         $clientUserId = !empty($_POST['client_user_id']) ? (int) $_POST['client_user_id'] : null;
         $generatedPassword = null;
 
-        if ($clientUserId === null && !empty($_POST['create_portal_access'])) {
-            [$clientUserId, $generatedPassword] = $this->createClientUser($contactName, $contactEmail, (string) ($_POST['contact_phone'] ?? ''));
+        if (!empty($_POST['create_portal_access'])) {
+            if ($clientUserId === null) {
+                [$clientUserId, $generatedPassword] = $this->createClientUser(
+                    $contactName,
+                    $contactEmail,
+                    (string) ($_POST['contact_phone'] ?? ''),
+                    (string) ($_POST['password_mode'] ?? 'auto'),
+                    (string) ($_POST['client_password'] ?? '')
+                );
+            } else {
+                $generatedPassword = $this->issuePasswordForUser(
+                    $clientUserId,
+                    (string) ($_POST['password_mode'] ?? 'auto'),
+                    (string) ($_POST['client_password'] ?? '')
+                );
+            }
         }
 
         $logoPath = null;
@@ -231,11 +245,16 @@ final class WizardController extends Controller
         ActivityLogger::log('client_created_via_wizard', 'client', $clientId, ['company_name' => $companyName]);
         $drafts->clear('client_onboarding', (int) $user['id']);
 
-        if (!empty($_POST['send_welcome_email']) && $clientUserId !== null) {
+        if (!empty($_POST['send_welcome_email']) && $clientUserId !== null && $generatedPassword !== null) {
             $this->sendPortalWelcomeEmail($contactEmail, $contactName, $companyName, $generatedPassword);
         }
 
-        $this->flash('success', 'Client created successfully. Next: assign the team or create the first calendar.');
+        $successMessage = 'Client created successfully. Next: assign the team or create the first calendar.';
+        if ($generatedPassword !== null) {
+            $successMessage .= " Temporary password: {$generatedPassword}";
+        }
+
+        $this->flash('success', $successMessage);
         $this->redirect('clients');
     }
 
@@ -524,7 +543,7 @@ final class WizardController extends Controller
         return !empty($assignment['employee_user_id']) ? (int) $assignment['employee_user_id'] : $fallbackUserId;
     }
 
-    private function createClientUser(string $name, string $email, string $phone): array
+    private function createClientUser(string $name, string $email, string $phone, string $passwordMode = 'auto', string $manualPassword = ''): array
     {
         $existing = Database::fetch(
             "SELECT u.id, r.name AS role_name
@@ -546,7 +565,14 @@ final class WizardController extends Controller
             throw new RuntimeException('Client role is missing from the database.');
         }
 
-        $password = 'G2-' . substr(bin2hex(random_bytes(6)), 0, 10);
+        $password = $passwordMode === 'manual'
+            ? trim($manualPassword)
+            : 'G2-' . substr(bin2hex(random_bytes(6)), 0, 10);
+
+        if ($passwordMode === 'manual' && $password === '') {
+            throw new RuntimeException('Manual password is required when manual password mode is selected.');
+        }
+
         $userId = Database::insert(
             'INSERT INTO users (role_id, name, email, password, status, phone) VALUES (:role_id, :name, :email, :password, :status, :phone)',
             [
@@ -562,21 +588,32 @@ final class WizardController extends Controller
         return [$userId, $password];
     }
 
+    private function issuePasswordForUser(int $userId, string $passwordMode = 'auto', string $manualPassword = ''): string
+    {
+        $password = $passwordMode === 'manual'
+            ? trim($manualPassword)
+            : 'G2-' . substr(bin2hex(random_bytes(6)), 0, 10);
+
+        if ($passwordMode === 'manual' && $password === '') {
+            throw new RuntimeException('Manual password is required when manual password mode is selected.');
+        }
+
+        Database::query(
+            'UPDATE users SET password = :password WHERE id = :id',
+            ['password' => password_hash($password, PASSWORD_DEFAULT), 'id' => $userId]
+        );
+
+        return $password;
+    }
+
     private function sendPortalWelcomeEmail(string $email, string $name, string $companyName, ?string $generatedPassword): void
     {
-        $body = "Welcome to G2 Social Calendar for {$companyName}.\n\nYou can review artwork, approve posts, and leave feedback from one shared workspace.";
-        if ($generatedPassword !== null) {
-            $body .= "\n\nTemporary password: {$generatedPassword}";
+        if ($generatedPassword === null) {
+            return;
         }
 
         try {
-            (new MailTransport($this->config))->send(
-                $email,
-                $name,
-                'Welcome to G2 Social Calendar',
-                $body,
-                nl2br(htmlspecialchars($body, ENT_QUOTES, 'UTF-8'))
-            );
+            (new ClientWelcomeMailer($this->config))->send($email, $name, $companyName, $email, $generatedPassword);
         } catch (Throwable) {
         }
     }
@@ -610,7 +647,7 @@ final class WizardController extends Controller
             $itemId,
             'item_submitted',
             'New post submitted for approval',
-            "Post: {$item['title']}\nClient: {$item['company_name']}\nStatus: Pending Approval\nLink: index.php?route=approval.review&item_id={$itemId}"
+            "A new post is ready for your review in the G2 Social Media Calendar.\n\nPost title: {$item['title']}\nClient: {$item['company_name']}\nPlatform: {$item['platform']}\nScheduled date: {$item['scheduled_date']}\nStatus: Pending Approval\n\nUse the button below to open the review page and approve it or request changes."
         );
     }
 

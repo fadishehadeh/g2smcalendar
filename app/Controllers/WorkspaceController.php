@@ -136,18 +136,8 @@ final class WorkspaceController extends Controller
 
     public function campaigns(): void
     {
-        Auth::requireRole(['master_admin', 'employee', 'client']);
-        $workspace = new WorkspaceService();
-        $filters = [
-            'client_id' => $_GET['client_id'] ?? '',
-        ];
-
-        $this->view('workspace/campaigns', [
-            'title' => 'Campaigns',
-            'filters' => $filters,
-            'campaigns' => $workspace->campaigns($filters),
-            'clients' => $workspace->clientCards(),
-        ]);
+        http_response_code(404);
+        $this->view('errors/404', ['title' => 'Not Found']);
     }
 
     public function reports(): void
@@ -172,15 +162,22 @@ final class WorkspaceController extends Controller
         $reports = new ReportService($this->config, new WorkspaceSettingsService(), $workspace);
         $type = in_array((string) ($_POST['report_type'] ?? 'monthly'), ['weekly', 'monthly'], true) ? (string) $_POST['report_type'] : 'monthly';
         $sendEmail = !empty($_POST['send_email']);
-        $reports->generate($type, [
+        $reportId = $reports->generate($type, [
             'month' => $_POST['month'] ?? date('n'),
             'year' => $_POST['year'] ?? date('Y'),
             'client_id' => $_POST['client_id'] ?? '',
             'platform' => $_POST['platform'] ?? '',
             'recipient_email' => $_POST['recipient_email'] ?? '',
         ], $sendEmail);
-        $this->flash('success', strtoupper($type) . ' report generated.');
-        $this->redirect('reports');
+        $reports->streamDownload($reportId);
+    }
+
+    public function downloadReport(): void
+    {
+        Auth::requireRole(['master_admin', 'employee']);
+        $workspace = new WorkspaceService();
+        $reports = new ReportService($this->config, new WorkspaceSettingsService(), $workspace);
+        $reports->streamDownload((int) ($_GET['report_id'] ?? 0));
     }
 
     public function dispatchReports(): void

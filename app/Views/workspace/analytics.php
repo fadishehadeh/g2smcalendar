@@ -17,8 +17,8 @@ foreach ($platforms as $platformRow) {
 }
 ?>
 
-<section class="toolbar-card">
-    <form method="get" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php" class="toolbar-grid">
+<section class="toolbar-card" data-page-skeleton>
+    <form method="get" action="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php" class="toolbar-grid" data-inline-validate>
         <input type="hidden" name="route" value="analytics">
         <label><span>Month</span><input type="number" name="month" min="1" max="12" value="<?= (int) $filters['month'] ?>"></label>
         <label><span>Year</span><input type="number" name="year" min="2024" max="2035" value="<?= (int) $filters['year'] ?>"></label>
@@ -44,7 +44,7 @@ foreach ($platforms as $platformRow) {
     </form>
 </section>
 
-<section class="kpi-grid analytics-kpis">
+<section class="kpi-grid analytics-kpis" data-page-skeleton>
     <article class="kpi-card">
         <div class="kpi-top"><span class="icon-swatch tone-red"><?= Ui::icon('trend') ?></span></div>
         <strong><?= number_format((int) ($totals['reach'] ?? 0)) ?></strong>
@@ -67,7 +67,7 @@ foreach ($platforms as $platformRow) {
     </article>
 </section>
 
-<section class="dashboard-grid analytics-grid">
+<section class="dashboard-grid analytics-grid" data-page-skeleton>
     <article class="card">
         <div class="card-head">
             <div>
@@ -105,7 +105,7 @@ foreach ($platforms as $platformRow) {
     </article>
 </section>
 
-<section class="table-card">
+<section class="table-card" data-page-skeleton>
     <table class="data-table">
         <thead>
             <tr>
@@ -121,16 +121,16 @@ foreach ($platforms as $platformRow) {
         <tbody>
             <?php foreach ($posts as $post): ?>
                 <tr data-row-link="<?= htmlspecialchars($config['app']['base_url']) ?>/index.php?route=calendar.item&item_id=<?= (int) $post['id'] ?>">
-                    <td>
+                    <td data-label="Post">
                         <strong><?= htmlspecialchars($post['title']) ?></strong>
                         <small><?= htmlspecialchars($post['scheduled_date']) ?></small>
                     </td>
-                    <td><?= htmlspecialchars($post['company_name']) ?></td>
-                    <td><?= Ui::platformIcon($post['platform']) ?></td>
-                    <td><?= number_format((int) $post['reach']) ?></td>
-                    <td><?= number_format((int) $post['engagement']) ?></td>
-                    <td><?= number_format((int) $post['clicks']) ?></td>
-                    <td><span class="status-badge <?= Ui::statusClass($post['status']) ?>"><?= htmlspecialchars($post['status']) ?></span></td>
+                    <td data-label="Client"><?= htmlspecialchars($post['company_name']) ?></td>
+                    <td data-label="Platform"><?= Ui::platformIcon($post['platform']) ?></td>
+                    <td data-label="Reach"><?= number_format((int) $post['reach']) ?></td>
+                    <td data-label="Engagement"><?= number_format((int) $post['engagement']) ?></td>
+                    <td data-label="Clicks"><?= number_format((int) $post['clicks']) ?></td>
+                    <td data-label="Status"><span class="status-badge <?= Ui::statusClass($post['status']) ?>"><?= htmlspecialchars($post['status']) ?></span></td>
                 </tr>
             <?php endforeach; ?>
         </tbody>

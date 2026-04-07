@@ -56,10 +56,6 @@
                     <strong>Fadi</strong>
                     <span>Assigned clients and approvals</span>
                 </button>
-                <button class="demo-card" type="button" data-demo-email="fshehadeh@gmail.com" data-demo-password="password">
-                    <strong>DB</strong>
-                    <span>Review and approve content</span>
-                </button>
             </div>
         </div>
     </div>

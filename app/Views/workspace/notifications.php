@@ -6,7 +6,7 @@ require dirname(__DIR__) . '/partials/header.php';
 $subtitle = count($notifications) . ' recent notifications and workflow updates.';
 require dirname(__DIR__) . '/partials/page-header.php';
 ?>
-<section class="card">
+<section class="card" data-page-skeleton>
     <div class="notification-list large-list">
         <?php foreach ($notifications as $notification): ?>
             <a class="notification-item is-clickable" href="<?= htmlspecialchars($config['app']['base_url'] . '/' . ltrim($notification['detail_url'], '/')) ?>">

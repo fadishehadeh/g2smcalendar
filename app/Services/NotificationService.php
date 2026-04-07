@@ -15,6 +15,10 @@ final class NotificationService
 
     public function notify(int $userId, ?int $itemId, string $type, string $subject, string $body): void
     {
+        if ($this->wasRecentlySent($userId, $itemId, $type, $subject, $body)) {
+            return;
+        }
+
         $notificationId = Database::insert(
             'INSERT INTO notifications (user_id, calendar_item_id, type, subject, body, sent_at, provider, provider_message_id, provider_message_uuid, provider_status, provider_response) VALUES (:user_id, :item_id, :type, :subject, :body, NULL, NULL, NULL, NULL, NULL, NULL)',
             [
@@ -35,7 +39,7 @@ final class NotificationService
             return;
         }
 
-        $link = $this->buildItemLink($itemId);
+        $link = $this->buildItemLink($itemId, $type);
         $textBody = trim($body . ($link !== '' ? "\n\nOpen Item: " . $link : ''));
         $htmlBody = $this->buildHtml($recipient['name'] ?? '', $subject, $body, $link);
 
@@ -86,14 +90,42 @@ final class NotificationService
         }
     }
 
-    private function buildItemLink(?int $itemId): string
+    private function buildItemLink(?int $itemId, string $type): string
     {
         if (!$itemId) {
             return '';
         }
 
         $baseUrl = rtrim((string) ($this->config['app']['url'] ?? ''), '/');
-        return $baseUrl . '/index.php?route=calendar.item&item_id=' . $itemId;
+        $route = $type === 'item_submitted' ? 'approval.review' : 'calendar.item';
+
+        return $baseUrl . '/index.php?route=' . $route . '&item_id=' . $itemId;
+    }
+
+    private function wasRecentlySent(int $userId, ?int $itemId, string $type, string $subject, string $body): bool
+    {
+        $recent = Database::fetch(
+            'SELECT id
+             FROM notifications
+             WHERE user_id = :user_id
+               AND ((calendar_item_id = :item_id) OR (calendar_item_id IS NULL AND :item_id IS NULL))
+               AND type = :type
+               AND subject = :subject
+               AND body = :body
+               AND sent_at IS NOT NULL
+               AND sent_at >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+             ORDER BY id DESC
+             LIMIT 1',
+            [
+                'user_id' => $userId,
+                'item_id' => $itemId,
+                'type' => $type,
+                'subject' => $subject,
+                'body' => $body,
+            ]
+        );
+
+        return $recent !== null;
     }
 
     private function buildHtml(string $recipientName, string $subject, string $body, string $link): string
